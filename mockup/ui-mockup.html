@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Translator — Mockup UI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #eef1f6;
+  --win: #f8fafc;
+  --side: #ffffff;
+  --card: #ffffff;
+  --line: #e2e8f0;
+  --text: #0f172a;
+  --muted: #64748b;
+  --accent: #2563eb;
+  --accent-2: #0d9488;
+  --accent-soft: #dbeafe;
+  --ok: #16a34a;
+  --warn: #d97706;
+  --danger: #dc2626;
+  --chip: #f1f5f9;
+  --shadow: 0 1px 2px rgba(15,23,42,.06), 0 8px 24px rgba(15,23,42,.06);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #05070d; --win: #0b1020; --side: #0e1428; --card: #121a30; --line: #1f2a44;
+    --text: #e2e8f0; --muted: #8b9ab5; --accent: #3b82f6; --accent-2: #14b8a6; --accent-soft: #172554;
+    --chip: #18223b; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 32px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #05070d; --win: #0b1020; --side: #0e1428; --card: #121a30; --line: #1f2a44;
+  --text: #e2e8f0; --muted: #8b9ab5; --accent: #3b82f6; --accent-2: #14b8a6; --accent-soft: #172554;
+  --chip: #18223b; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 12px 32px rgba(0,0,0,.35);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 14px/1.45 "Inter", "Segoe UI", system-ui, sans-serif;
+  padding: 32px 16px 48px;
+}
+.page-head { max-width: 1180px; margin: 0 auto 18px; display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+.page-head h1 { font-size: 18px; margin: 0; }
+.page-head p { margin: 0; color: var(--muted); }
+.page-head .theme-btn { margin-left: auto; }
+
+/* ---------- Jendela ---------- */
+.window {
+  min-width: 0;
+  max-width: 1180px; margin: 0 auto; background: var(--win); border: 1px solid var(--line);
+  border-radius: 12px; box-shadow: var(--shadow); overflow: hidden;
+}
+.titlebar { height: 36px; display: flex; align-items: center; gap: 10px; padding: 0 0 0 14px; border-bottom: 1px solid var(--line); background: var(--side); }
+.titlebar img, .titlebar svg.logo { width: 18px; height: 18px; }
+.titlebar span { font-size: 12px; color: var(--muted); }
+.titlebar .ctl { margin-left: auto; display: flex; }
+.titlebar .ctl i { width: 46px; height: 36px; display: grid; place-items: center; color: var(--muted); font-style: normal; font-size: 12px; }
+.titlebar .ctl i:last-child:hover { background: #e81123; color: #fff; }
+
+.body { display: grid; grid-template-columns: 220px 1fr; min-height: 640px; }
+
+/* ---------- Sidebar ---------- */
+.side { background: var(--side); border-right: 1px solid var(--line); padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 16px; }
+.brand b { display: block; font-size: 15px; }
+.brand small { color: var(--muted); font-size: 11px; }
+.nav { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px; color: var(--muted); cursor: pointer; border: 0; background: none; font: inherit; text-align: left; width: 100%; }
+.nav:hover { background: var(--chip); color: var(--text); }
+.nav.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.nav svg { width: 18px; height: 18px; flex: none; }
+.nav .dot { margin-left: auto; width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+.nav .dot.live { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 25%, transparent); }
+.side .spacer { flex: 1; }
+.vram { padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+.vram .row { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+.vram .row b { color: var(--text); font-weight: 600; }
+.bar { height: 6px; border-radius: 99px; background: var(--chip); margin: 8px 0 6px; overflow: hidden; display: flex; }
+.bar i { display: block; height: 100%; }
+.legend { display: flex; gap: 8px; flex-wrap: wrap; font-size: 11px; color: var(--muted); }
+.legend span::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; background: var(--c); vertical-align: -1px; }
+
+/* ---------- Konten ---------- */
+.main { padding: 20px 24px 24px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.hero { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.hero h2 { margin: 0; font-size: 20px; }
+.hero p { margin: 2px 0 0; color: var(--muted); }
+.start {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 10px; border: 0; cursor: pointer;
+  padding: 12px 22px; border-radius: 10px; font: 600 15px "Inter", sans-serif; color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.start.running { background: var(--danger); box-shadow: 0 6px 18px color-mix(in srgb, var(--danger) 30%, transparent); }
+.start svg { width: 16px; height: 16px; }
+
+.pills { display: flex; gap: 8px; flex-wrap: wrap; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 99px; background: var(--chip); font-size: 12px; color: var(--muted); }
+.pill i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+.pill.ok i { background: var(--ok); }
+.pill.load i { background: var(--warn); animation: blink 1s infinite; }
+@keyframes blink { 50% { opacity: .3; } }
+
+.grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 16px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+.card h3 { margin: 0 0 12px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.card h3 .switch { margin-left: auto; }
+.field { margin-bottom: 14px; }
+.field:last-child { margin-bottom: 0; }
+.field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; font-weight: 500; }
+.select { width: 100%; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--win); color: var(--text); font: inherit; }
+
+/* pasangan bahasa */
+.langpair { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); gap: 8px; align-items: center; }
+.swap { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); background: var(--win); color: var(--text); cursor: pointer; display: grid; place-items: center; }
+
+/* pemilih sumber suara */
+.sources { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+.src { border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: var(--win); cursor: pointer; display: flex; flex-direction: column; gap: 6px; text-align: left; color: var(--text); font: inherit; position: relative; }
+.src:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
+.src.on { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+.src .ic { width: 28px; height: 28px; border-radius: 7px; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 12px; }
+.src b { font-size: 13px; font-weight: 600; }
+.src small { color: var(--muted); font-size: 11px; }
+.src .eq { position: absolute; top: 12px; right: 10px; display: flex; gap: 2px; align-items: flex-end; height: 12px; }
+.src .eq[hidden] { display: none; }
+.src .eq i { width: 3px; background: var(--ok); border-radius: 1px; animation: eq .9s infinite ease-in-out; }
+.src .eq i:nth-child(2) { animation-delay: .2s; } .src .eq i:nth-child(3) { animation-delay: .4s; }
+@keyframes eq { 0%,100% { height: 3px; } 50% { height: 12px; } }
+
+/* level meter */
+.meter { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); }
+.meter .lv { flex: 1; height: 8px; border-radius: 99px; background: var(--chip); overflow: hidden; }
+.meter .lv i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--ok), var(--warn)); transition: width .12s; }
+
+/* switch */
+.switch { position: relative; width: 36px; height: 20px; flex: none; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch span { position: absolute; inset: 0; border-radius: 99px; background: var(--line); cursor: pointer; transition: .2s; }
+.switch span::after { content: ""; position: absolute; left: 3px; top: 3px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: .2s; }
+.switch input:checked + span { background: var(--accent); }
+.switch input:checked + span::after { transform: translateX(16px); }
+.toggle-row { display: flex; align-items: center; gap: 10px; justify-content: space-between; padding: 8px 0; border-top: 1px solid var(--line); }
+.toggle-row:first-of-type { border-top: 0; }
+.toggle-row small { display: block; color: var(--muted); font-size: 12px; }
+
+/* slider */
+input[type=range] { width: 100%; accent-color: var(--accent); }
+
+/* pratinjau subtitle */
+.preview { position: relative; border-radius: 10px; overflow: hidden; height: 150px; background:
+  linear-gradient(135deg, #1e293b, #334155); display: flex; align-items: flex-end; justify-content: center; padding: 14px; }
+.preview .vid { position: absolute; inset: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 10px; opacity: .55; }
+.preview .vid i { border-radius: 6px; background: #475569; }
+.sub { position: relative; max-width: 92%; padding: 8px 14px; border-radius: 8px; text-align: center; background: rgba(0,0,0,var(--op, .75)); }
+.sub .o { color: #cbd5e1; font-size: calc(var(--fs, 22px) * .62); }
+.sub .t { color: #fff; font-weight: 600; font-size: calc(var(--fs, 22px) * .78); }
+
+/* transkrip langsung */
+.feed { display: flex; flex-direction: column; gap: 10px; max-height: 300px; overflow: auto; padding-right: 4px; }
+.msg { display: grid; grid-template-columns: 28px 1fr; gap: 10px; }
+.msg .av { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; }
+.msg.in .av { background: var(--accent-soft); color: var(--accent); }
+.msg.out .av { background: color-mix(in srgb, var(--accent-2) 20%, transparent); color: var(--accent-2); }
+.msg .o { color: var(--muted); font-size: 13px; }
+.msg .t { font-weight: 500; }
+.msg .meta { font-size: 11px; color: var(--muted); margin-top: 2px; display: flex; gap: 8px; }
+.msg .meta b { font-weight: 500; padding: 0 6px; border-radius: 4px; background: var(--chip); }
+.empty { color: var(--muted); text-align: center; padding: 30px 0; }
+
+/* bicara */
+.voice { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px dashed var(--line); border-radius: 10px; }
+.voice .wave { flex: 1; display: flex; gap: 2px; align-items: center; height: 32px; }
+.voice .wave i { flex: 1; background: var(--accent-2); border-radius: 2px; opacity: .7; }
+.btn { padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--win); color: var(--text); font: 500 13px "Inter", sans-serif; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+.btn.rec { border-color: color-mix(in srgb, var(--danger) 45%, var(--line)); color: var(--danger); }
+.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.alert { display: flex; gap: 10px; padding: 10px 12px; border-radius: 8px; font-size: 13px; background: color-mix(in srgb, var(--warn) 12%, transparent); color: var(--text); border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent); }
+.alert b { color: var(--warn); }
+.flow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+.flow span { padding: 4px 8px; border-radius: 6px; background: var(--chip); color: var(--text); }
+
+.tab { display: none; } .tab.on { display: flex; flex-direction: column; gap: 16px; }
+.seg { display: inline-flex; padding: 3px; border-radius: 8px; background: var(--chip); gap: 2px; }
+.seg button { border: 0; background: none; padding: 6px 12px; border-radius: 6px; font: 500 13px "Inter", sans-serif; color: var(--muted); cursor: pointer; }
+.seg button.on { background: var(--card); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.1); }
+
+.notes { max-width: 1180px; margin: 20px auto 0; color: var(--muted); font-size: 13px; }
+.notes ul { margin: 6px 0 0; padding-left: 18px; }
+
+@media (max-width: 900px) {
+  .body { grid-template-columns: minmax(0, 1fr); }
+  .side { flex-direction: row; flex-wrap: wrap; border-right: 0; border-bottom: 1px solid var(--line); }
+  .brand, .side .spacer { display: none; }
+  .nav { width: auto; }
+  .vram { width: 100%; }
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .start { margin-left: 0; }
+}
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <h1>AI Translator — mockup UI baru</h1>
+  <p>Interaktif: klik menu kiri, tombol Mulai, sumber suara, dan pengaturan subtitle.</p>
+  <button class="btn theme-btn" id="themeBtn">◐ Ganti tema</button>
+</div>
+
+<div class="window">
+  <div class="titlebar">
+    <svg class="logo" viewBox="0 0 64 64"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2563eb"/><stop offset="1" stop-color="#0d9488"/></linearGradient></defs><rect width="64" height="64" rx="14" fill="url(#g)"/><rect x="7" y="9" width="31" height="26" rx="6" fill="#fff"/><rect x="26" y="27" width="31" height="26" rx="6" fill="#0f172a"/><text x="22.5" y="29" font-size="19" font-weight="700" fill="#2563eb" text-anchor="middle" font-family="Segoe UI">A</text><text x="41.5" y="47" font-size="17" fill="#fff" text-anchor="middle">文</text></svg>
+    <span>AI Translator</span>
+    <div class="ctl"><i>—</i><i>☐</i><i>✕</i></div>
+  </div>
+
+  <div class="body">
+    <!-- ================= SIDEBAR ================= -->
+    <nav class="side">
+      <div class="brand">
+        <svg width="34" height="34" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="url(#g)"/><rect x="7" y="9" width="31" height="26" rx="6" fill="#fff"/><rect x="26" y="27" width="31" height="26" rx="6" fill="#0f172a"/><text x="22.5" y="29" font-size="19" font-weight="700" fill="#2563eb" text-anchor="middle" font-family="Segoe UI">A</text><text x="41.5" y="47" font-size="17" fill="#fff" text-anchor="middle">文</text></svg>
+        <div><b>AI Translator</b><small>Offline · TranslateGemma 4B</small></div>
+      </div>
+      <button class="nav on" data-tab="dengar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 14v-2a9 9 0 0 1 18 0v2"/><rect x="2" y="14" width="5" height="7" rx="2"/><rect x="17" y="14" width="5" height="7" rx="2"/></svg>
+        Dengar <span class="dot" id="dotListen"></span>
+      </button>
+      <button class="nav" data-tab="bicara">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></svg>
+        Bicara <span class="dot" id="dotSpeak"></span>
+      </button>
+      <button class="nav" data-tab="riwayat">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+        Riwayat
+      </button>
+      <button class="nav" data-tab="engine">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="5" width="14" height="14" rx="2"/><path d="M9 1v4M15 1v4M9 19v4M15 19v4M1 9h4M1 15h4M19 9h4M19 15h4"/></svg>
+        Engine
+      </button>
+      <div class="spacer"></div>
+      <div class="vram">
+        <div class="row"><span>VRAM GPU</span><b id="vramTxt">1,2 / 6,0 GB</b></div>
+        <div class="bar" id="vramBar"><i style="width:20%;background:#94a3b8"></i></div>
+        <div class="legend"><span style="--c:#94a3b8">Windows</span><span style="--c:#3b82f6">Whisper</span><span style="--c:#14b8a6">Gemma</span><span style="--c:#a855f7">XTTS</span></div>
+      </div>
+    </nav>
+
+    <!-- ================= KONTEN ================= -->
+    <main class="main">
+      <div class="hero">
+        <div>
+          <h2 id="heroTitle">Siap menerjemahkan</h2>
+          <p id="heroSub">Klik Mulai untuk memuat model ke GPU (±15 detik).</p>
+        </div>
+        <button class="start" id="startBtn">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l13 8-13 8z"/></svg><span>Mulai</span>
+        </button>
+      </div>
+      <div class="pills" id="pills">
+        <span class="pill"><i></i>Whisper small</span>
+        <span class="pill"><i></i>TranslateGemma 4B</span>
+        <span class="pill"><i></i>XTTS-v2</span>
+        <span class="pill"><i></i>CABLE Input</span>
+      </div>
+
+      <!-- ===== DENGAR ===== -->
+      <section class="tab on" id="tab-dengar">
+        <div class="grid">
+          <div class="card">
+            <h3>Sumber suara
+              <label class="switch" title="Aktifkan arah Dengar"><input type="checkbox" id="listenOn" checked><span></span></label>
+            </h3>
+            <div class="field">
+              <label>Tangkap dari</label>
+              <div class="sources" id="sources">
+                <button class="src" data-app=""><span class="ic" style="background:#64748b">∑</span><b>Semua suara</b><small>Speaker default</small></button>
+                <button class="src on" data-app="Zoom.exe"><span class="ic" style="background:#2d8cff">Z</span><b>Zoom</b><small>Zoom.exe</small><span class="eq" hidden><i></i><i></i><i></i></span></button>
+                <button class="src" data-app="chrome.exe"><span class="ic" style="background:#ea4335">G</span><b>Chrome</b><small>Meet, YouTube</small></button>
+                <button class="src" data-app="ms-teams.exe"><span class="ic" style="background:#5b5fc7">T</span><b>Teams</b><small>ms-teams.exe</small></button>
+                <button class="src" data-app="Discord.exe"><span class="ic" style="background:#5865f2">D</span><b>Discord</b><small>Discord.exe</small></button>
+                <button class="src" data-app="more"><span class="ic" style="background:var(--chip);color:var(--muted)">↻</span><b>Lainnya…</b><small>Muat ulang daftar</small></button>
+              </div>
+            </div>
+            <div class="field">
+              <label>Bahasa</label>
+              <div class="langpair">
+                <select class="select"><option>Deteksi otomatis</option><option>English</option><option>日本語</option><option>中文</option></select>
+                <button class="swap" title="Tukar">⇄</button>
+                <select class="select"><option>Bahasa Indonesia</option><option>English</option></select>
+              </div>
+            </div>
+            <div class="field">
+              <label>Level input</label>
+              <div class="meter"><div class="lv"><i id="lvListen"></i></div><span id="lvListenTxt">–</span></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Subtitle melayang</h3>
+            <div class="preview" id="preview">
+              <div class="vid"><i></i><i></i><i></i><i></i></div>
+              <div class="sub" id="sub">
+                <div class="o" id="subO">Let's go over the budget for next quarter.</div>
+                <div class="t" id="subT">Mari kita bahas anggaran untuk kuartal berikutnya.</div>
+              </div>
+            </div>
+            <div class="field" style="margin-top:14px">
+              <label>Ukuran font: <span id="fsVal">22</span> px</label>
+              <input type="range" min="14" max="40" value="22" id="fs">
+            </div>
+            <div class="field">
+              <label>Gelap latar: <span id="opVal">75</span>%</label>
+              <input type="range" min="0" max="100" value="75" id="op">
+            </div>
+            <div class="toggle-row"><div>Tampilkan teks asli<small>Di atas terjemahan</small></div><label class="switch"><input type="checkbox" id="showO" checked><span></span></label></div>
+            <div class="toggle-row"><div>Sembunyikan saat share screen<small>Peserta lain tidak melihat subtitle</small></div><label class="switch"><input type="checkbox" checked><span></span></label></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Transkrip langsung <span style="margin-left:auto" class="seg"><button class="on">Semua</button><button>Dengar</button><button>Bicara</button></span></h3>
+          <div class="feed" id="feed"><div class="empty">Transkrip akan muncul di sini setelah Mulai.</div></div>
+        </div>
+      </section>
+
+      <!-- ===== BICARA ===== -->
+      <section class="tab" id="tab-bicara">
+        <div class="alert"><b>⚠</b><div>Belum ada mikrofon fisik yang terdeteksi. Colokkan headset/earphone ber-mic, lalu klik ↻.</div></div>
+        <div class="grid">
+          <div class="card">
+            <h3>Suara Anda → virtual mic
+              <label class="switch"><input type="checkbox" id="speakOn" checked><span></span></label>
+            </h3>
+            <div class="flow" style="margin-bottom:14px"><span>🎤 Mic</span>→<span>Whisper</span>→<span>Gemma</span>→<span>XTTS (suara Anda)</span>→<span>CABLE Output</span>→<span>Zoom/Meet</span></div>
+            <div class="field"><label>Mikrofon</label><select class="select"><option>Headset Microphone (Realtek)</option><option>Mic default Windows</option></select></div>
+            <div class="field">
+              <label>Bahasa</label>
+              <div class="langpair">
+                <select class="select"><option>Bahasa Indonesia</option></select>
+                <button class="swap">⇄</button>
+                <select class="select"><option>English</option><option>日本語</option><option>中文</option></select>
+              </div>
+            </div>
+            <div class="field"><label>Kirim ke</label><select class="select"><option>CABLE Input (VB-Audio Virtual Cable)</option></select></div>
+            <div class="field">
+              <label>Level mic</label>
+              <div class="meter"><div class="lv"><i id="lvSpeak"></i></div><span id="lvSpeakTxt">–</span></div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Sampel suara</h3>
+            <div class="voice">
+              <div class="wave" id="wave"></div>
+              <button class="btn">▶</button>
+            </div>
+            <p style="color:var(--muted);font-size:12px;margin:8px 0 14px">my_voice.wav · 15 detik · direkam 2 Okt 2026</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn rec">● Rekam ulang 15 dtk</button>
+              <button class="btn">Pilih file…</button>
+            </div>
+            <div class="toggle-row" style="margin-top:14px"><div>XTTS di GPU<small>Matikan untuk hemat VRAM (lebih lambat)</small></div><label class="switch"><input type="checkbox" checked><span></span></label></div>
+            <div class="toggle-row"><div>Dengar suara terjemahan sendiri<small>Putar juga ke headset untuk memantau</small></div><label class="switch"><input type="checkbox"><span></span></label></div>
+            <p style="color:var(--muted);font-size:12px;margin:12px 0 0">Di Zoom/Meet pilih mikrofon <b style="color:var(--text)">CABLE Output</b>. Model suara XTTS-v2: non-komersial.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== RIWAYAT ===== -->
+      <section class="tab" id="tab-riwayat">
+        <div class="card">
+          <h3>Sesi tersimpan <button class="btn" style="margin-left:auto">Buka folder</button></h3>
+          <div class="feed" style="max-height:none">
+            <div class="msg in"><div class="av">📄</div><div><div class="t">2026-10-02 18:14 · Rapat mingguan</div><div class="meta"><b>42 kalimat</b><b>EN → ID</b><span>38 menit</span></div></div></div>
+            <div class="msg in"><div class="av">📄</div><div><div class="t">2026-10-01 09:30 · Webinar</div><div class="meta"><b>118 kalimat</b><b>JA → ID</b><span>1 jam 12 menit</span></div></div></div>
+            <div class="msg out"><div class="av">📄</div><div><div class="t">2026-09-30 15:02 · Call klien</div><div class="meta"><b>27 kalimat</b><b>ID ⇄ EN</b><span>22 menit</span></div></div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== ENGINE ===== -->
+      <section class="tab" id="tab-engine">
+        <div class="grid">
+          <div class="card">
+            <h3>Pengenalan suara</h3>
+            <div class="field"><label>Model Whisper</label>
+              <div class="seg"><button>tiny</button><button>base</button><button class="on">small</button><button>medium</button><button>large-v3-turbo</button></div>
+            </div>
+            <p style="color:var(--muted);font-size:12px;margin:0">small: ±0,3 dtk per kalimat di RTX 3050. Model lebih besar = lebih akurat, butuh VRAM lebih banyak.</p>
+          </div>
+          <div class="card">
+            <h3>Mesin terjemahan</h3>
+            <div class="field"><div class="seg"><button class="on">Bawaan (offline)</button><button>Ollama / VPS</button></div></div>
+            <div class="field"><label>Server Ollama</label><input class="select" value="http://localhost:11434" disabled></div>
+            <div class="field"><label>Model</label><input class="select" value="translategemma:4b" disabled></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Lainnya</h3>
+          <div class="toggle-row"><div>Simpan transkrip<small>%APPDATA%\AI Translator\transcripts</small></div><label class="switch"><input type="checkbox" checked><span></span></label></div>
+          <div class="toggle-row"><div>Mulai bersama Windows<small>Minimalkan ke system tray</small></div><label class="switch"><input type="checkbox"><span></span></label></div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<div class="notes">
+  <b>Catatan mockup</b>
+  <ul>
+    <li>Semua elemen bisa dibuat di PySide6 (QSS + widget kustom kecil untuk kartu aplikasi, level meter, dan bar VRAM).</li>
+    <li>Baru di mockup ini: navigasi samping, kartu "Tangkap dari" per-aplikasi, pratinjau subtitle langsung, level meter, indikator VRAM, status model, tema terang/gelap.</li>
+    <li>Ide opsional (belum ada di aplikasi): pemantauan suara terjemahan sendiri, mulai bersama Windows/system tray, halaman riwayat sesi.</li>
+  </ul>
+</div>
+
+<script>
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+
+// tema
+$("#themeBtn").onclick = () => {
+  const r = document.documentElement;
+  const dark = r.dataset.theme ? r.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  r.dataset.theme = dark ? "light" : "dark";
+};
+
+// navigasi
+$$(".nav").forEach(b => b.onclick = () => {
+  $$(".nav").forEach(x => x.classList.toggle("on", x === b));
+  $$(".tab").forEach(t => t.classList.toggle("on", t.id === "tab-" + b.dataset.tab));
+});
+$$(".seg").forEach(seg => seg.querySelectorAll("button").forEach(b => b.onclick = () => {
+  seg.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+}));
+
+// sumber suara
+$$(".src").forEach(b => b.onclick = () => {
+  if (b.dataset.app === "more") return;
+  $$(".src").forEach(x => x.classList.toggle("on", x === b));
+});
+
+// subtitle
+const sub = $("#sub");
+$("#fs").oninput = e => { sub.style.setProperty("--fs", e.target.value + "px"); $("#fsVal").textContent = e.target.value; };
+$("#op").oninput = e => { sub.style.setProperty("--op", e.target.value / 100); $("#opVal").textContent = e.target.value; };
+$("#showO").onchange = e => { $("#subO").style.display = e.target.checked ? "" : "none"; };
+
+// gelombang sampel suara
+const wave = $("#wave");
+for (let i = 0; i < 48; i++) {
+  const h = 20 + 70 * Math.abs(Math.sin(i * 0.7) * Math.cos(i * 0.23));
+  const bar = document.createElement("i"); bar.style.height = h + "%"; wave.appendChild(bar);
+}
+
+// simulasi sesi
+const LINES = [
+  ["in", "Good morning everyone, thanks for joining.", "Selamat pagi semuanya, terima kasih sudah bergabung.", "en", 381, 277],
+  ["in", "Today we will discuss the budget for next year.", "Hari ini kita akan membahas anggaran untuk tahun depan.", "en", 275, 648],
+  ["out", "Baik, saya sudah siapkan ringkasannya.", "Okay, I have prepared the summary.", "id", 310, 402],
+  ["in", "Great. Could you share your screen?", "Bagus. Bisakah Anda membagikan layar Anda?", "en", 296, 351],
+  ["out", "Tentu, tunggu sebentar.", "Sure, one moment.", "id", 240, 288],
+];
+let running = false, timers = [];
+function setPills(state) {
+  $$("#pills .pill").forEach((p, i) => {
+    p.className = "pill " + (state === "idle" ? "" : state === "load" ? (i < 2 ? "ok" : "load") : "ok");
+  });
+}
+function setVram(parts) {
+  const total = 6;
+  const cols = ["#94a3b8", "#3b82f6", "#14b8a6", "#a855f7"];
+  $("#vramBar").innerHTML = parts.map((v, i) => `<i style="width:${v / total * 100}%;background:${cols[i]}"></i>`).join("");
+  $("#vramTxt").textContent = parts.reduce((a, b) => a + b, 0).toFixed(1).replace(".", ",") + " / 6,0 GB";
+}
+function addMsg([dir, o, t, lang, asr, mt]) {
+  const feed = $("#feed");
+  if (feed.querySelector(".empty")) feed.innerHTML = "";
+  const el = document.createElement("div");
+  el.className = "msg " + dir;
+  el.innerHTML = `<div class="av">${dir === "in" ? "🔊" : "🎤"}</div><div><div class="o"></div><div class="t"></div>
+    <div class="meta"><b>${lang.toUpperCase()}</b><span>ASR ${asr} ms · terjemah ${mt} ms</span></div></div>`;
+  el.querySelector(".o").textContent = o; el.querySelector(".t").textContent = t;
+  feed.appendChild(el); feed.scrollTop = feed.scrollHeight;
+  if (dir === "in") { $("#subO").textContent = o; $("#subT").textContent = t; }
+}
+let lvTimer;
+function levels(on) {
+  clearInterval(lvTimer);
+  if (!on) { ["#lvListen", "#lvSpeak"].forEach(s => $(s).style.width = "0"); $("#lvListenTxt").textContent = $("#lvSpeakTxt").textContent = "–"; return; }
+  lvTimer = setInterval(() => {
+    const a = 15 + Math.random() * 65, b = Math.random() < .4 ? 10 + Math.random() * 60 : 3;
+    $("#lvListen").style.width = a + "%"; $("#lvSpeak").style.width = b + "%";
+    $("#lvListenTxt").textContent = Math.round(-60 + a * .55) + " dB"; $("#lvSpeakTxt").textContent = Math.round(-60 + b * .55) + " dB";
+  }, 140);
+}
+$("#startBtn").onclick = () => {
+  const btn = $("#startBtn");
+  timers.forEach(clearTimeout); timers = [];
+  running = !running;
+  const eq = $(".src.on .eq");
+  $$(".src .eq").forEach(e => e.hidden = true);
+  if (!running) {
+    btn.classList.remove("running");
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l13 8-13 8z"/></svg><span>Mulai</span>';
+    $("#heroTitle").textContent = "Berhenti"; $("#heroSub").textContent = "Model dilepas dari GPU.";
+    $("#dotListen").className = $("#dotSpeak").className = "dot";
+    setPills("idle"); setVram([1.2]); levels(false);
+    return;
+  }
+  btn.classList.add("running");
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg><span>Berhenti</span>';
+  $("#heroTitle").textContent = "Memuat model…"; $("#heroSub").textContent = "Whisper ✓ · TranslateGemma ✓ · XTTS-v2 memanaskan…";
+  setPills("load"); setVram([1.2, 0.9, 2.6]);
+  timers.push(setTimeout(() => {
+    const src = $(".src.on");
+    $("#heroTitle").textContent = "Sedang menerjemahkan";
+    $("#heroSub").textContent = "Dengar: " + src.querySelector("b").textContent + " → Bahasa Indonesia · Bicara: ID → English";
+    setPills("ok"); setVram([1.2, 0.9, 2.6, 1.2]); levels(true);
+    $("#dotListen").className = "dot live"; $("#dotSpeak").className = "dot live";
+    if (src.querySelector(".eq")) src.querySelector(".eq").hidden = false;
+    LINES.forEach((l, i) => timers.push(setTimeout(() => addMsg(l), 900 + i * 1700)));
+  }, 1600));
+};
+</script>
+</body>
+</html>

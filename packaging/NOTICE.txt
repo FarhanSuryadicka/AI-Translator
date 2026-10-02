@@ -1,0 +1,30 @@
+AI Translator - Lisensi komponen pihak ketiga
+==============================================
+
+Aplikasi ini menyertakan model dan perangkat lunak berikut. Dengan menginstal,
+Anda setuju mematuhi lisensi masing-masing.
+
+1. TranslateGemma 4B (Google DeepMind) - model terjemahan
+   Lisensi: Gemma Terms of Use  https://ai.google.dev/gemma/terms
+   Kebijakan penggunaan: https://ai.google.dev/gemma/prohibited_use_policy
+   File GGUF hasil konversi oleh mradermacher (Hugging Face).
+
+2. XTTS-v2 (Coqui) - model peniru suara
+   Lisensi: Coqui Public Model License 1.0.0 (CPML)  https://coqui.ai/cpml
+   HANYA UNTUK PENGGUNAAN NON-KOMERSIAL.
+
+3. Whisper "small" (OpenAI) via faster-whisper (SYSTRAN) - pengenal suara
+   Lisensi: MIT
+
+4. llama.cpp (ggml-org) - mesin inferensi
+   Lisensi: MIT  https://github.com/ggml-org/llama.cpp
+
+5. PyTorch (BSD-3), NVIDIA CUDA runtime/cuDNN/cuBLAS (NVIDIA EULA, didistribusikan
+   bersama PyTorch), Qt for Python / PySide6 (LGPLv3), coqui-tts (MPL-2.0),
+   CTranslate2 (MIT), PortAudio/PyAudioWPatch (MIT).
+
+Fitur "Bicara -> virtual mic" membutuhkan VB-Audio Virtual Cable
+(https://vb-audio.com/Cable/), yang diinstal terpisah oleh pengguna.
+
+Gunakan fitur peniru suara hanya untuk suara Anda sendiri, atau suara orang
+yang telah memberi izin.

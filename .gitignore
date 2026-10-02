@@ -1,0 +1,39 @@
+# --- File besar: diunduh ulang lewat packaging\download_models.py ---
+models/
+vendor/
+*.gguf
+*.bin
+*.safetensors
+*.pt
+*.pth
+*.onnx
+
+# --- Hasil build (PyInstaller + Inno Setup, ~5-8 GB) ---
+build/
+dist/
+*.exe
+*.zip
+
+# --- Python ---
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# --- Data pribadi pengguna (dibuat saat aplikasi jalan dari source) ---
+config.json
+app.log
+*.log
+transcripts/
+voices/
+*.wav
+
+# --- Catatan serah-terima antar sesi (bukan dokumentasi) ---
+HANDOFF.md
+
+# --- Editor / OS ---
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+.claude/

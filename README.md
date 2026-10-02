@@ -1,0 +1,119 @@
+# AI Translator
+
+Penerjemah suara **real-time dua arah** untuk Windows, untuk Zoom, Google Meet, Teams, Discord, YouTube, dan aplikasi lain.
+Semua proses berjalan **offline di GPU Anda**. Tidak ada audio yang dikirim ke internet.
+
+```
+DENGAR : suara aplikasi (WASAPI loopback) → Whisper → TranslateGemma 4B → subtitle melayang
+BICARA : mic Anda → Whisper → TranslateGemma 4B → XTTS-v2 (suara tiruan Anda) → VB-Cable → Zoom/Meet
+```
+
+## Fitur
+
+- **Subtitle terjemahan melayang**: selalu di atas aplikasi lain, bisa digeser dan diubah ukurannya,
+  dan tidak ikut terlihat saat share screen.
+- **Tangkap per-aplikasi**: terjemahkan hanya suara Zoom atau Chrome, sementara notifikasi dan musik diabaikan.
+- **Bicara dengan suara sendiri**: ucapan Anda diterjemahkan lalu diucapkan ulang dengan tiruan suara Anda,
+  dan dikirim ke rapat lewat virtual mic.
+- **Offline**: Whisper, TranslateGemma (llama.cpp), dan XTTS-v2 sudah termasuk di installer.
+  Mesin terjemahan juga bisa dipindah ke Ollama lokal atau di VPS.
+- Transkrip setiap sesi otomatis disimpan sebagai file teks.
+
+## Kebutuhan PC
+
+| | Minimum |
+|---|---|
+| OS | Windows 11, atau Windows 10 64-bit (per-aplikasi butuh build 20348+) |
+| GPU | NVIDIA, VRAM 6 GB, driver terbaru. Tanpa GPU tetap jalan di CPU, tapi lambat |
+| RAM | 16 GB |
+| Disk | ~10 GB |
+| Lainnya | Headset disarankan untuk fitur Bicara, plus [VB-Audio Virtual Cable](https://vb-audio.com/Cable/) (gratis) |
+
+## Instalasi (pengguna)
+
+1. Salin **kedua file installer** ke satu folder: `AI-Translator-Setup-1.0.0.exe` dan `AI-Translator-Setup-1.0.0-1.bin`.
+   Flashdisk harus berformat NTFS atau exFAT, karena FAT32 tidak bisa menyimpan file di atas 4 GB.
+2. Jalankan `AI-Translator-Setup-1.0.0.exe` → Next → Finish. Tidak perlu internet.
+3. Langkah ini hanya untuk fitur **Bicara**: instal VB-Audio Virtual Cable (klik kanan → *Run as administrator*), lalu restart PC.
+
+## Cara pakai
+
+**Dengar (terjemahkan orang lain)**
+1. Pilih **Tangkap dari**: *Semua suara*, atau *Hanya aplikasi: Zoom.exe / chrome.exe / ...*.
+   Aplikasinya harus sudah terbuka. Klik ↻ untuk memuat ulang daftar.
+2. Pilih bahasa sumber (atau *Deteksi otomatis*) dan bahasa tujuan, lalu klik **▶ Mulai**.
+
+**Bicara (terjemahkan suara Anda)**
+1. Centang fitur Bicara, pilih mikrofon, lalu klik **● Rekam 15 dtk** untuk membuat sampel suara.
+2. Klik **▶ Mulai**. Di Zoom/Meet/Teams, pilih mikrofon **"CABLE Output (VB-Audio Virtual Cable)"**.
+
+Pengaturan, transkrip, sampel suara, dan log disimpan di `%APPDATA%\AI Translator`.
+
+## Performa (RTX 3050 6 GB)
+
+| Tahap | Waktu per kalimat |
+|---|---|
+| Whisper small (ASR) | ~0,3–0,65 dtk |
+| TranslateGemma 4B Q4_K_M (llama.cpp) | ~0,3–0,9 dtk |
+| XTTS-v2, sampai suara pertama keluar | ~0,75 dtk |
+| VRAM total, semua fitur aktif (termasuk Windows) | ~5,9 GB |
+
+## Untuk developer
+
+Butuh: Python 3.9 (64-bit), Git, NVIDIA driver, dan untuk membuat installer
+[Inno Setup 6](https://jrsoftware.org/isinfo.php) (`winget install JRSoftware.InnoSetup`).
+
+```bat
+git clone https://github.com/<user>/ai-translator.git
+cd ai-translator
+setup.bat                                             :: .venv + PyTorch CUDA 12.4 + dependensi
+.venv\Scripts\python.exe packaging\download_models.py --xtts   :: model + llama.cpp (~5 GB)
+run.bat                                               :: jalankan dari source
+.venv\Scripts\python.exe main.py --selftest           :: uji semua model tanpa UI (hasil di app.log)
+powershell -ExecutionPolicy Bypass -File packaging\build.ps1   :: build .exe + installer
+```
+
+Model dan llama.cpp **tidak disimpan di git** karena ukurannya beberapa GB.
+`download_models.py` menaruhnya di:
+
+| Folder | Isi | Sumber |
+|---|---|---|
+| `models/translategemma/` | `translategemma-4b-it.Q4_K_M.gguf` | [mradermacher/translategemma-4b-it-GGUF](https://huggingface.co/mradermacher/translategemma-4b-it-GGUF) |
+| `models/whisper/faster-whisper-small/` | Whisper small (CTranslate2) | [Systran/faster-whisper-small](https://huggingface.co/Systran/faster-whisper-small) |
+| `models/tts/` | XTTS-v2 (opsi `--xtts`, lisensi CPML) | Coqui |
+| `vendor/llama/` | llama.cpp `b11344` win-cuda-12.4-x64 + cudart | [ggml-org/llama.cpp releases](https://github.com/ggml-org/llama.cpp/releases/tag/b11344) |
+
+### Struktur kode
+
+| File | Isi |
+|---|---|
+| `main.py` | Entry point, logging, `--selftest` |
+| `app/config.py` | Pengaturan (`config.json`), path `APP_DIR` (read-only) dan `DATA_DIR` (bisa ditulis) |
+| `app/audio_capture.py` | Loopback/mic via WASAPI, pemutar ke virtual mic, rekam sampel |
+| `app/process_loopback.py` | Tangkap audio satu aplikasi (WASAPI process loopback, ctypes) |
+| `app/segmenter.py` | VAD berbasis energi, memotong audio per kalimat |
+| `app/asr.py` · `app/translator.py` · `app/tts.py` | Whisper · TranslateGemma (llama-server / Ollama) · XTTS-v2 |
+| `app/pipeline.py` | Sesi dua arah yang berbagi satu Whisper dan satu penerjemah |
+| `app/ui/` | Jendela utama (PySide6) dan overlay subtitle |
+| `packaging/` | Spec PyInstaller, script Inno Setup, build, ikon, unduh model |
+| `mockup/` | Mockup HTML untuk desain UI berikutnya |
+
+### Hal yang perlu diketahui
+- **Muat `torch` sebelum `ctranslate2`.** Kalau urutannya terbalik, XTTS crash dengan error `cudnnGetLibConfig` (sudah ditangani di `asr.py`).
+- llama-server untuk TranslateGemma wajib memakai `--no-jinja --chat-template gemma`. Prompt Gemma dibentuk manual lewat `/completion`.
+- VRAM 6 GB hampir penuh, jadi llama-server memakai `-c 1024 -b 256 -ub 256 -fa on`.
+- Jangan rebuild PyInstaller selama ada junction `build\dist\AI Translator\models` atau `vendor`.
+  `rmtree` di Python 3.9 bisa mengikuti junction itu dan menghapus model asli. Lepas dulu dengan `cmd /c rmdir`.
+- Simpan model sebagai file biasa (`local_dir=`), jangan memakai cache Hugging Face. Cache HF memakai symlink, dan symlink rusak saat dibundel.
+
+Untuk Ollama di VPS: jalankan dengan `OLLAMA_HOST=0.0.0.0`, dan **batasi aksesnya** (firewall, VPN, atau reverse proxy dengan auth).
+
+## Lisensi
+
+Kode aplikasi: tentukan sendiri (misalnya MIT). Komponen pihak ketiga punya lisensi masing-masing, lihat [packaging/NOTICE.txt](packaging/NOTICE.txt):
+
+- **XTTS-v2**: Coqui Public Model License, **hanya untuk penggunaan non-komersial**.
+- **TranslateGemma**: Gemma Terms of Use.
+- **VB-Audio Cable** tidak dibundel. Pengguna mengunduhnya sendiri.
+
+Gunakan fitur peniru suara hanya untuk suara Anda sendiri, atau suara orang yang sudah memberi izin.

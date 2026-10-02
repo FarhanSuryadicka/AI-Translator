@@ -28,6 +28,9 @@ LLAMA_ZIPS = [
 # Visual C++ runtime untuk llama-server.exe. Ikut dibundel (app-local) agar PC tujuan
 # tidak perlu menginstal "VC++ Redistributable".
 VC_RUNTIME = ["msvcp140.dll", "vcruntime140.dll", "vcruntime140_1.dll"]
+# Paket resmi VB-CABLE (donationware, VB-Audio), dibundel apa adanya untuk dipasang oleh installer.
+VBCABLE_URL = "https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack45.zip"
+VBCABLE_DIR = os.path.join(ROOT, "vendor", "vbcable")
 
 
 def translategemma():
@@ -76,6 +79,15 @@ def vc_runtime():
             print("[..] salin", name, "-> vendor/llama")
 
 
+def vbcable():
+    if os.path.exists(os.path.join(VBCABLE_DIR, "VBCABLE_Setup_x64.exe")):
+        return print("[ok] VB-CABLE sudah ada")
+    print("[..]", VBCABLE_URL)
+    os.makedirs(VBCABLE_DIR, exist_ok=True)
+    with urllib.request.urlopen(VBCABLE_URL) as r:
+        zipfile.ZipFile(io.BytesIO(r.read())).extractall(VBCABLE_DIR)
+
+
 def xtts():
     os.environ["COQUI_TOS_AGREED"] = "1"
     os.environ["TTS_HOME"] = MODELS
@@ -89,6 +101,7 @@ def main():
     translategemma()
     whisper()
     llama_cpp()
+    vbcable()
     if "--xtts" in sys.argv:
         xtts()
     else:

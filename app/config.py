@@ -49,7 +49,8 @@ class Config:
     mic_device: str = ""
     mic_language: str = "id"
     speak_target_language: str = "en"
-    virtual_mic_device: str = "CABLE Input (VB-Audio Virtual Cable)"
+    # Kosong = otomatis: speaker VB-CABLE ("AI Translator Speaker" setelah dirapikan, atau "CABLE Input").
+    virtual_mic_device: str = ""
     voice_sample: str = os.path.join(DATA_DIR, "voices", "my_voice.wav")
     tts_device: str = "cuda"
     xtts_license_agreed: bool = False

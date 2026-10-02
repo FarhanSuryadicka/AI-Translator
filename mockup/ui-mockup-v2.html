@@ -1,0 +1,1072 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Translator — Mockup v2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #e9edf3; --win: #f6f8fb; --side: #ffffff; --card: #ffffff; --sunken: #f1f4f8;
+  --line: #e3e8ef; --line-strong: #cfd7e3;
+  --text: #0f172a; --muted: #64748b; --faint: #94a3b8;
+  --accent: #2563eb; --accent-2: #0d9488; --accent-soft: #e0e9ff; --accent-text: #1d4ed8;
+  --ok: #16a34a; --ok-soft: #dcfce7; --warn: #d97706; --warn-soft: #fef3c7; --danger: #dc2626; --danger-soft: #fee2e2;
+  --listen: #2563eb; --speak: #0d9488;
+  --shadow: 0 1px 2px rgba(15,23,42,.05), 0 10px 30px rgba(15,23,42,.08);
+  --radius: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #04060b; --win: #0a0f1c; --side: #0d1322; --card: #111a2d; --sunken: #0c1424;
+    --line: #1c2740; --line-strong: #2a3756;
+    --text: #e5ebf5; --muted: #8b9ab5; --faint: #5d6b86;
+    --accent: #3b82f6; --accent-2: #14b8a6; --accent-soft: #15234a; --accent-text: #93b4ff;
+    --ok: #22c55e; --ok-soft: #0f2a1b; --warn: #f59e0b; --warn-soft: #2d2109; --danger: #f87171; --danger-soft: #2f1215;
+    --listen: #3b82f6; --speak: #14b8a6;
+    --shadow: 0 1px 2px rgba(0,0,0,.5), 0 16px 40px rgba(0,0,0,.4);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #04060b; --win: #0a0f1c; --side: #0d1322; --card: #111a2d; --sunken: #0c1424;
+  --line: #1c2740; --line-strong: #2a3756;
+  --text: #e5ebf5; --muted: #8b9ab5; --faint: #5d6b86;
+  --accent: #3b82f6; --accent-2: #14b8a6; --accent-soft: #15234a; --accent-text: #93b4ff;
+  --ok: #22c55e; --ok-soft: #0f2a1b; --warn: #f59e0b; --warn-soft: #2d2109; --danger: #f87171; --danger-soft: #2f1215;
+  --listen: #3b82f6; --speak: #14b8a6;
+  --shadow: 0 1px 2px rgba(0,0,0,.5), 0 16px 40px rgba(0,0,0,.4);
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 "Inter", "Segoe UI", system-ui, sans-serif; padding: 28px 16px 40px; }
+button, input, select { font: inherit; color: inherit; }
+svg { flex: none; }
+
+.page-head { max-width: 1240px; margin: 0 auto 14px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.page-head h1 { margin: 0; font-size: 17px; }
+.page-head p { margin: 0; color: var(--muted); font-size: 13px; }
+
+/* ===== Window ===== */
+.window { max-width: 1240px; margin: 0 auto; background: var(--win); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; position: relative; }
+.titlebar { height: 34px; display: flex; align-items: center; gap: 8px; padding-left: 12px; background: var(--side); border-bottom: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+.titlebar .ctl { margin-left: auto; display: flex; }
+.titlebar .ctl span { width: 44px; height: 34px; display: grid; place-items: center; }
+.layout { display: grid; grid-template-columns: 236px minmax(0, 1fr); min-height: 720px; }
+
+/* ===== Sidebar ===== */
+.side { background: var(--side); border-right: 1px solid var(--line); padding: 14px 12px; display: flex; flex-direction: column; gap: 2px; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 14px; }
+.brand b { font-size: 15px; display: block; }
+.brand small { font-size: 11px; color: var(--muted); }
+.nav-label { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); padding: 12px 10px 4px; }
+.nav { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 0; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; text-align: left; font-weight: 500; }
+.nav:hover { background: var(--sunken); color: var(--text); }
+.nav.on { background: var(--accent-soft); color: var(--accent-text); }
+.nav svg { width: 18px; height: 18px; }
+.nav .badge { margin-left: auto; font-size: 11px; padding: 1px 7px; border-radius: 99px; background: var(--sunken); color: var(--muted); font-weight: 600; }
+.nav .badge.warn { background: var(--warn-soft); color: var(--warn); }
+.nav .live { margin-left: auto; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 25%, transparent); display: none; }
+.running .nav .live.show { display: block; }
+.side .grow { flex: 1; }
+.health { border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: var(--card); display: flex; flex-direction: column; gap: 8px; font-size: 12px; }
+.health .row { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.health .row b { margin-left: auto; color: var(--text); font-weight: 600; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); flex: none; }
+.dot.ok { background: var(--ok); } .dot.warn { background: var(--warn); } .dot.bad { background: var(--danger); }
+.vbar { height: 6px; border-radius: 99px; background: var(--sunken); display: flex; overflow: hidden; }
+.vbar i { height: 100%; transition: width .5s; }
+
+/* ===== Main ===== */
+.main { display: flex; flex-direction: column; min-width: 0; }
+.topbar { display: flex; align-items: center; gap: 12px; padding: 14px 24px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--win) 85%, transparent); position: sticky; top: 0; z-index: 3; flex-wrap: wrap; }
+.topbar h2 { margin: 0; font-size: 18px; }
+.topbar .sub { color: var(--muted); font-size: 13px; }
+.session { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.sess-state { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 99px; background: var(--sunken); font-size: 13px; color: var(--muted); }
+.sess-state .dot { transition: background .3s; }
+.running .sess-state { color: var(--text); }
+.running .sess-state .dot { background: var(--ok); animation: pulse 1.4s infinite; }
+.loading .sess-state .dot { background: var(--warn); animation: pulse .8s infinite; }
+@keyframes pulse { 50% { opacity: .35; } }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 8px 14px; border-radius: 9px; border: 1px solid var(--line-strong); background: var(--card); cursor: pointer; font-weight: 500; font-size: 13px; white-space: nowrap; }
+.btn:hover { border-color: var(--accent); }
+.btn svg { width: 15px; height: 15px; }
+.btn.primary { border: 0; color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 30%, transparent); }
+.btn.primary.stop { background: var(--danger); box-shadow: 0 4px 14px color-mix(in srgb, var(--danger) 30%, transparent); }
+.btn.big { padding: 11px 20px; font-size: 14px; border-radius: 10px; }
+.btn.ghost { border-color: transparent; background: none; color: var(--muted); }
+.btn.ghost:hover { color: var(--text); background: var(--sunken); }
+.btn.warn { border-color: color-mix(in srgb, var(--warn) 50%, var(--line)); color: var(--warn); }
+.btn.danger { border-color: color-mix(in srgb, var(--danger) 45%, var(--line)); color: var(--danger); }
+.iconbtn { width: 34px; height: 34px; padding: 0; }
+
+.content { padding: 20px 24px 28px; display: flex; flex-direction: column; gap: 16px; }
+.page { display: none; flex-direction: column; gap: 16px; }
+.page.on { display: flex; animation: fade .2s; }
+@keyframes fade { from { opacity: 0; transform: translateY(4px); } }
+
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.split { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; min-width: 0; }
+.card.flush { padding: 0; overflow: hidden; }
+.card-h { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.card-h h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.card-h .hint { color: var(--muted); font-size: 12px; }
+.card-h .end { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.muted { color: var(--muted); } .small { font-size: 12px; }
+
+/* banner */
+.banner { display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 12px; border: 1px solid; font-size: 13px; }
+.banner.warn { background: var(--warn-soft); border-color: color-mix(in srgb, var(--warn) 35%, transparent); }
+.banner.warn .ic { color: var(--warn); }
+.banner.info { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
+.banner .ic { font-size: 18px; }
+.banner .txt { flex: 1; }
+.banner .txt b { display: block; }
+.banner[hidden] { display: none; }
+
+/* direction cards on Beranda */
+.dir { position: relative; border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; background: var(--card); display: flex; flex-direction: column; gap: 14px; overflow: hidden; }
+.dir::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 3px; background: var(--c); opacity: .9; }
+.dir.off { opacity: .6; }
+.dir-h { display: flex; align-items: center; gap: 12px; }
+.dir-ic { width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center; background: color-mix(in srgb, var(--c) 14%, transparent); color: var(--c); }
+.dir-ic svg { width: 20px; height: 20px; }
+.dir-h b { display: block; font-size: 15px; }
+.dir-h small { color: var(--muted); font-size: 12px; }
+.dir-h .switch { margin-left: auto; }
+.route { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 10px; background: var(--sunken); font-size: 13px; flex-wrap: wrap; }
+.route .chip { padding: 3px 9px; border-radius: 6px; background: var(--card); border: 1px solid var(--line); font-weight: 500; }
+.route .arr { color: var(--faint); }
+.lang { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; align-items: center; }
+.select, .input { width: 100%; padding: 9px 11px; border-radius: 9px; border: 1px solid var(--line-strong); background: var(--win); min-width: 0; }
+.swap { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line-strong); background: var(--win); cursor: pointer; }
+.meter { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); }
+.meter .lv { flex: 1; height: 6px; border-radius: 99px; background: var(--sunken); overflow: hidden; }
+.meter .lv i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--ok), var(--warn)); transition: width .12s; }
+.meter span { width: 52px; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* checklist */
+.checks { display: flex; flex-direction: column; }
+.check { display: flex; gap: 12px; align-items: center; padding: 11px 0; border-top: 1px solid var(--line); }
+.check:first-child { border-top: 0; padding-top: 0; }
+.check .st { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; flex: none; }
+.st.ok { background: var(--ok-soft); color: var(--ok); }
+.st.warn { background: var(--warn-soft); color: var(--warn); }
+.st.bad { background: var(--danger-soft); color: var(--danger); }
+.check .t { flex: 1; min-width: 0; }
+.check .t b { display: block; font-weight: 500; }
+.check .t small { color: var(--muted); font-size: 12px; }
+
+/* stats */
+.stat { display: flex; flex-direction: column; gap: 2px; }
+.stat b { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.stat small { color: var(--muted); font-size: 12px; }
+
+/* sources */
+.sources { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 10px; }
+.src { position: relative; display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--win); cursor: pointer; text-align: left; }
+.src:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.src.on { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent); background: var(--card); }
+.src .logo { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 13px; }
+.src b { font-size: 13px; font-weight: 600; }
+.src small { font-size: 11px; color: var(--muted); }
+.src .eq { position: absolute; top: 14px; right: 12px; display: flex; align-items: flex-end; gap: 2px; height: 12px; }
+.src .eq i { width: 3px; border-radius: 1px; background: var(--ok); height: 3px; }
+.src.playing .eq i { animation: eq .9s infinite ease-in-out; }
+.src.playing .eq i:nth-child(2) { animation-delay: .2s; } .src.playing .eq i:nth-child(3) { animation-delay: .4s; }
+@keyframes eq { 0%, 100% { height: 3px; } 50% { height: 12px; } }
+
+/* feed */
+.feed { display: flex; flex-direction: column; gap: 4px; max-height: 340px; overflow: auto; }
+.msg { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 10px; padding: 10px; border-radius: 10px; }
+.msg:hover { background: var(--sunken); }
+.msg .av { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; }
+.msg.in .av { background: color-mix(in srgb, var(--listen) 15%, transparent); color: var(--listen); }
+.msg.out .av { background: color-mix(in srgb, var(--speak) 15%, transparent); color: var(--speak); }
+.msg .o { color: var(--muted); font-size: 13px; }
+.msg .tr { font-weight: 500; }
+.msg .meta { font-size: 11px; color: var(--faint); margin-top: 3px; display: flex; gap: 8px; flex-wrap: wrap; }
+.msg .meta b { font-weight: 600; color: var(--muted); }
+.msg time { font-size: 11px; color: var(--faint); font-variant-numeric: tabular-nums; }
+.empty { text-align: center; color: var(--muted); padding: 34px 12px; }
+.empty svg { width: 34px; height: 34px; color: var(--faint); display: block; margin: 0 auto 8px; }
+
+/* segmented */
+.seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: 9px; background: var(--sunken); flex-wrap: wrap; }
+.seg button { border: 0; background: none; padding: 6px 12px; border-radius: 7px; cursor: pointer; color: var(--muted); font-weight: 500; font-size: 13px; }
+.seg button.on { background: var(--card); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+
+/* switch */
+.switch { position: relative; width: 38px; height: 22px; flex: none; display: inline-block; }
+.switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+.switch span { position: absolute; inset: 0; border-radius: 99px; background: var(--line-strong); cursor: pointer; transition: .2s; }
+.switch span::after { content: ""; position: absolute; left: 3px; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: .2s; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+.switch input:checked + span { background: var(--accent); }
+.switch input:checked + span::after { transform: translateX(16px); }
+.switch input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.rows { display: flex; flex-direction: column; }
+.row-s { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-top: 1px solid var(--line); }
+.row-s:first-child { border-top: 0; padding-top: 0; }
+.row-s:last-child { padding-bottom: 0; }
+.row-s .t { flex: 1; min-width: 0; }
+.row-s .t b { display: block; font-weight: 500; }
+.row-s .t small { color: var(--muted); font-size: 12px; }
+.row-s .ctl { flex: none; display: flex; align-items: center; gap: 8px; }
+.row-s .ctl .select { width: 230px; }
+label.f { display: block; font-size: 12px; font-weight: 500; color: var(--muted); margin-bottom: 6px; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+
+/* speak pipeline */
+.flow { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.stage { position: relative; padding: 12px 10px; border-radius: 12px; background: var(--sunken); border: 1px solid var(--line); text-align: center; transition: .25s; }
+.stage svg { width: 20px; height: 20px; color: var(--muted); display: block; margin: 0 auto 6px; }
+.stage b { display: block; font-size: 12px; font-weight: 600; }
+.stage small { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
+.stage.active { border-color: var(--speak); background: color-mix(in srgb, var(--speak) 10%, var(--card)); }
+.stage.active svg { color: var(--speak); }
+.stage:not(:last-child)::after { content: ""; position: absolute; right: -7px; top: 50%; width: 6px; height: 2px; background: var(--line-strong); }
+
+/* voice sample */
+.voice { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 12px; background: var(--sunken); }
+.play { width: 38px; height: 38px; border-radius: 50%; border: 0; background: var(--speak); color: #fff; display: grid; place-items: center; cursor: pointer; }
+.wave { flex: 1; display: flex; align-items: center; gap: 2px; height: 36px; }
+.wave i { flex: 1; border-radius: 2px; background: color-mix(in srgb, var(--speak) 60%, transparent); }
+.rec-box { border: 1px dashed var(--line-strong); border-radius: 12px; padding: 14px; display: none; }
+.rec-box.on { display: block; }
+.rec-box p { margin: 0 0 10px; font-size: 13px; }
+.rec-box blockquote { margin: 0 0 12px; padding: 10px 12px; border-left: 3px solid var(--speak); background: var(--sunken); border-radius: 0 8px 8px 0; font-size: 14px; }
+.ring { display: flex; align-items: center; gap: 12px; }
+.ring .count { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--danger); width: 46px; }
+.prog { flex: 1; height: 6px; border-radius: 99px; background: var(--sunken); overflow: hidden; }
+.prog i { display: block; height: 100%; width: 0; background: var(--danger); transition: width 1s linear; }
+
+/* app guides */
+.guide { display: grid; grid-template-columns: 28px minmax(0,1fr); gap: 10px; align-items: start; padding: 8px 0; font-size: 13px; }
+.guide .n { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent-text); font-size: 12px; font-weight: 600; }
+kbd { font: 600 12px "Inter", sans-serif; padding: 1px 6px; border-radius: 5px; border: 1px solid var(--line-strong); background: var(--sunken); }
+
+/* subtitle preview */
+.stage-prev { position: relative; border-radius: 12px; overflow: hidden; aspect-ratio: 16 / 8.5; background: #0b1220; }
+.meet { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); gap: 6px; padding: 10px 10px 46px; }
+.meet i { border-radius: 8px; background: linear-gradient(160deg, #1e293b, #334155); position: relative; }
+.meet i::after { content: ""; position: absolute; left: 50%; top: 42%; width: 22%; aspect-ratio: 1; border-radius: 50%; transform: translate(-50%, -50%); background: #475569; }
+.meet-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 38px; background: #0f172a; display: flex; justify-content: center; align-items: center; gap: 10px; }
+.meet-bar span { width: 26px; height: 26px; border-radius: 50%; background: #334155; }
+.meet-bar span.red { background: #dc2626; width: 44px; border-radius: 13px; }
+.ovl { position: absolute; left: 50%; transform: translateX(-50%); width: 78%; padding: 8px 16px; border-radius: 10px; text-align: center; background: rgba(0,0,0,var(--op,.72)); cursor: grab; transition: top .25s, bottom .25s; }
+.ovl.bottom { bottom: 52px; } .ovl.top { top: 14px; }
+.ovl .o { color: #cbd5e1; font-size: calc(var(--fs, 22px) * .58); }
+.ovl .tr { color: #fff; font-weight: 600; font-size: calc(var(--fs, 22px) * .74); line-height: 1.3; }
+.ovl .tag { position: absolute; top: -9px; right: 10px; font-size: 10px; padding: 1px 6px; border-radius: 4px; background: var(--accent); color: #fff; font-weight: 600; }
+
+/* history */
+.hist { display: grid; grid-template-columns: 300px minmax(0, 1fr); min-height: 520px; }
+.hist-list { border-right: 1px solid var(--line); display: flex; flex-direction: column; }
+.hist-list .search { padding: 12px; border-bottom: 1px solid var(--line); }
+.hist-item { padding: 12px 14px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.hist-item:hover { background: var(--sunken); }
+.hist-item.on { background: var(--accent-soft); }
+.hist-item b { display: block; font-size: 13px; font-weight: 600; }
+.hist-item small { color: var(--muted); font-size: 12px; }
+.tags { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.tag { font-size: 11px; padding: 1px 7px; border-radius: 5px; background: var(--sunken); color: var(--muted); font-weight: 500; }
+.hist-item.on .tag { background: var(--card); }
+.hist-view { display: flex; flex-direction: column; min-width: 0; }
+.hist-view .hd { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.hist-view .hd b { font-size: 15px; }
+.hist-view .bd { padding: 8px 10px; overflow: auto; max-height: 470px; }
+
+/* settings gpu */
+.gpu { display: flex; gap: 14px; align-items: center; }
+.gpu .chipimg { width: 48px; height: 48px; border-radius: 12px; display: grid; place-items: center; background: color-mix(in srgb, #76b900 18%, transparent); color: #5c9100; font-weight: 800; font-size: 13px; }
+.legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 8px; }
+.legend span::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: var(--c); margin-right: 5px; }
+.models { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.model { border: 1px solid var(--line); border-radius: 10px; padding: 10px; cursor: pointer; background: var(--win); text-align: left; }
+.model.on { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent); background: var(--card); }
+.model b { display: block; font-size: 13px; }
+.model small { display: block; font-size: 11px; color: var(--muted); }
+.bars { display: flex; gap: 3px; margin-top: 6px; }
+.bars i { flex: 1; height: 4px; border-radius: 2px; background: var(--line-strong); }
+.bars.acc i.f { background: var(--accent); } .bars.spd i.f { background: var(--accent-2); }
+
+/* about */
+.lic { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 14px; padding: 12px 0; border-top: 1px solid var(--line); font-size: 13px; }
+.lic:first-child { border-top: 0; padding-top: 0; }
+.lic small { grid-column: 1; color: var(--muted); font-size: 12px; }
+.lic .tag { grid-row: 1 / span 2; grid-column: 2; align-self: center; }
+.tag.nc { background: var(--warn-soft); color: var(--warn); }
+
+/* modal wizard */
+.scrim { position: absolute; inset: 0; background: rgba(2, 6, 23, .55); display: none; align-items: center; justify-content: center; z-index: 10; padding: 16px; }
+.scrim.on { display: flex; animation: fade .2s; }
+.modal { width: min(620px, 100%); background: var(--card); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; }
+.modal .steps { display: flex; gap: 6px; padding: 18px 22px 0; }
+.modal .steps i { flex: 1; height: 4px; border-radius: 99px; background: var(--line); }
+.modal .steps i.done { background: var(--accent); }
+.modal .mb { padding: 20px 22px 8px; min-height: 280px; }
+.modal h3 { margin: 0 0 6px; font-size: 19px; }
+.modal .lead { margin: 0 0 16px; color: var(--muted); }
+.modal .mf { display: flex; gap: 8px; padding: 14px 22px 18px; border-top: 1px solid var(--line); align-items: center; }
+.modal .mf .sp { flex: 1; color: var(--muted); font-size: 12px; }
+.wstep { display: none; } .wstep.on { display: block; animation: fade .2s; }
+.hero-ic { width: 64px; height: 64px; margin-bottom: 14px; }
+.lic-box { max-height: 130px; overflow: auto; padding: 12px; border-radius: 10px; background: var(--sunken); font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+.agree { display: flex; gap: 10px; align-items: center; font-size: 13px; }
+
+/* toast */
+.toast { position: absolute; left: 50%; bottom: 20px; transform: translate(-50%, 20px); opacity: 0; background: var(--text); color: var(--win); padding: 10px 16px; border-radius: 10px; font-size: 13px; transition: .25s; pointer-events: none; z-index: 20; box-shadow: var(--shadow); }
+.toast.on { opacity: 1; transform: translate(-50%, 0); }
+
+/* demo controls */
+.demo { max-width: 1240px; margin: 14px auto 0; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.demo .seg { background: var(--card); border: 1px solid var(--line); }
+.notes { max-width: 1240px; margin: 16px auto 0; font-size: 13px; color: var(--muted); }
+.notes ul { margin: 6px 0 0; padding-left: 18px; }
+
+@media (max-width: 1000px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+  .side { flex-direction: row; flex-wrap: wrap; border-right: 0; border-bottom: 1px solid var(--line); }
+  .brand, .nav-label, .side .grow, .health { display: none; }
+  .nav { width: auto; }
+  .grid2, .grid3, .split, .hist { grid-template-columns: minmax(0, 1fr); }
+  .hist-list { border-right: 0; border-bottom: 1px solid var(--line); }
+  .models { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stage::after { display: none; }
+  .row-s { flex-wrap: wrap; } .row-s .ctl .select { width: 100%; } .row-s .ctl { width: 100%; }
+  .session { margin-left: 0; width: 100%; }
+  .content, .topbar { padding-left: 16px; padding-right: 16px; }
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="brandg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2563eb"/><stop offset="1" stop-color="#0d9488"/></linearGradient>
+    <symbol id="logo" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="url(#brandg)"/><rect x="7" y="9" width="31" height="26" rx="6" fill="#fff"/><path d="M12 35l-3 9 10-9z" fill="#fff"/><rect x="26" y="27" width="31" height="26" rx="6" fill="#0f172a"/><path d="M52 53l3 9-10-9z" fill="#0f172a"/><text x="22.5" y="29" font-size="19" font-weight="700" fill="#2563eb" text-anchor="middle" font-family="Segoe UI, sans-serif">A</text><text x="41.5" y="47" font-size="17" fill="#fff" text-anchor="middle">文</text></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l9-7 9 7v10a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></symbol>
+    <symbol id="i-ear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14v-2a9 9 0 0 1 18 0v2"/><rect x="2" y="14" width="5" height="7" rx="2"/><rect x="17" y="14" width="5" height="7" rx="2"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></symbol>
+    <symbol id="i-cc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M10 10.5a2.5 2.5 0 1 0 0 3M17 10.5a2.5 2.5 0 1 0 0 3"/></symbol>
+    <symbol id="i-hist" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></symbol>
+    <symbol id="i-text" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V5h16v2M9 19h6M12 5v14"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/></symbol>
+    <symbol id="i-wave" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h2M6 8v8M10 5v14M14 8v8M18 10v4M22 12h0"/></symbol>
+    <symbol id="i-plug" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0zM12 18v4"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+  </defs>
+</svg>
+
+<div class="page-head">
+  <h1>AI Translator — mockup UI v2</h1>
+  <p>Semua fungsi aplikasi. Klik menu, tombol Mulai, dan pengaturan; pakai panel "Simulasi kondisi" di bawah jendela untuk melihat status lain.</p>
+</div>
+
+<div class="window" id="win">
+  <div class="titlebar">
+    <svg width="16" height="16"><use href="#logo"/></svg> AI Translator
+    <div class="ctl"><span>—</span><span>☐</span><span>✕</span></div>
+  </div>
+
+  <div class="layout">
+    <!-- ============ SIDEBAR ============ -->
+    <nav class="side" aria-label="Navigasi">
+      <div class="brand">
+        <svg width="36" height="36"><use href="#logo"/></svg>
+        <div><b>AI Translator</b><small>Offline · v1.1</small></div>
+      </div>
+      <button class="nav on" data-page="home"><svg><use href="#i-home"/></svg>Beranda</button>
+      <div class="nav-label">Terjemahan</div>
+      <button class="nav" data-page="listen"><svg><use href="#i-ear"/></svg>Dengar<span class="live show" data-live="listen"></span></button>
+      <button class="nav" data-page="speak"><svg><use href="#i-mic"/></svg>Bicara<span class="live show" data-live="speak"></span><span class="badge warn" id="speakBadge" hidden>1</span></button>
+      <button class="nav" data-page="subtitle"><svg><use href="#i-cc"/></svg>Subtitle</button>
+      <button class="nav" data-page="history"><svg><use href="#i-hist"/></svg>Riwayat<span class="badge">12</span></button>
+      <div class="nav-label">Sistem</div>
+      <button class="nav" data-page="settings"><svg><use href="#i-gear"/></svg>Pengaturan<span class="badge warn" id="setBadge" hidden>!</span></button>
+      <button class="nav" data-page="about"><svg><use href="#i-info"/></svg>Tentang</button>
+      <div class="grow"></div>
+      <div class="health" aria-label="Status sistem">
+        <div class="row"><span class="dot ok" id="hGpuDot"></span>GPU<b id="hGpu">RTX 3050</b></div>
+        <div class="row"><span class="dot ok" id="hMicDot"></span>Virtual mic<b id="hMic">Siap</b></div>
+        <div class="row"><span class="dot ok"></span>Model<b>3/3 terpasang</b></div>
+        <div>
+          <div class="row" style="margin-bottom:6px">VRAM<b id="hVram">1,2 / 6,0 GB</b></div>
+          <div class="vbar" id="hVbar"></div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- ============ MAIN ============ -->
+    <div class="main">
+      <header class="topbar">
+        <div>
+          <h2 id="pTitle">Beranda</h2>
+          <div class="sub" id="pSub">Atur arah terjemahan, lalu mulai sesi.</div>
+        </div>
+        <div class="session">
+          <div class="sess-state"><span class="dot"></span><span id="sessTxt">Siap</span></div>
+          <button class="btn primary" id="sessBtn"><svg><use href="#i-play"/></svg><span>Mulai sesi</span></button>
+          <button class="btn iconbtn ghost" id="themeBtn" title="Ganti tema"><svg><use href="#i-moon"/></svg></button>
+        </div>
+      </header>
+
+      <div class="content">
+        <div class="banner warn" id="gpuBanner" hidden>
+          <span class="ic">⚠</span>
+          <div class="txt"><b id="gpuBannerT">Tidak ada GPU NVIDIA</b><span id="gpuBannerD">Aplikasi jalan di CPU: subtitle tertunda ±5 detik, fitur Bicara tidak disarankan.</span></div>
+          <button class="btn warn" id="gpuBannerBtn" hidden>Unduh driver NVIDIA</button>
+        </div>
+
+        <!-- ===================== BERANDA ===================== -->
+        <section class="page on" id="page-home">
+          <div class="grid2">
+            <div class="dir" style="--c: var(--listen)" id="dirListen">
+              <div class="dir-h">
+                <div class="dir-ic"><svg><use href="#i-ear"/></svg></div>
+                <div><b>Dengar</b><small>Suara orang lain → subtitle</small></div>
+                <label class="switch"><input type="checkbox" checked data-dir="listen"><span></span></label>
+              </div>
+              <div class="route"><span class="chip" id="routeSrc">Zoom</span><span class="arr">→</span><span class="chip">Whisper</span><span class="arr">→</span><span class="chip">Gemma</span><span class="arr">→</span><span class="chip">Subtitle</span></div>
+              <div class="lang">
+                <select class="select" aria-label="Bahasa sumber"><option>Deteksi otomatis</option><option>English</option><option>日本語</option><option>中文</option><option>한국어</option></select>
+                <button class="swap" title="Tukar bahasa">⇄</button>
+                <select class="select" aria-label="Bahasa tujuan"><option>Bahasa Indonesia</option><option>English</option></select>
+              </div>
+              <div class="meter"><svg width="14" height="14"><use href="#i-wave"/></svg><div class="lv"><i data-meter="listen"></i></div><span data-meter-txt="listen">—</span></div>
+            </div>
+
+            <div class="dir" style="--c: var(--speak)" id="dirSpeak">
+              <div class="dir-h">
+                <div class="dir-ic"><svg><use href="#i-mic"/></svg></div>
+                <div><b>Bicara</b><small>Suara Anda → suara terjemahan di rapat</small></div>
+                <label class="switch"><input type="checkbox" checked data-dir="speak"><span></span></label>
+              </div>
+              <div class="route"><span class="chip">Headset Mic</span><span class="arr">→</span><span class="chip">Gemma</span><span class="arr">→</span><span class="chip">Suara Anda</span><span class="arr">→</span><span class="chip" id="routeVmic">AI Translator Mic</span></div>
+              <div class="lang">
+                <select class="select" aria-label="Bahasa Anda"><option>Bahasa Indonesia</option><option>Deteksi otomatis</option></select>
+                <button class="swap" title="Tukar bahasa">⇄</button>
+                <select class="select" aria-label="Bahasa suara"><option>English</option><option>日本語</option><option>中文</option><option>한국어</option></select>
+              </div>
+              <div class="meter"><svg width="14" height="14"><use href="#i-mic"/></svg><div class="lv"><i data-meter="speak"></i></div><span data-meter-txt="speak">—</span></div>
+            </div>
+          </div>
+
+          <div class="split">
+            <div class="card">
+              <div class="card-h"><h3>Transkrip langsung</h3>
+                <div class="end"><div class="seg" data-filter><button class="on" data-f="all">Semua</button><button data-f="in">Dengar</button><button data-f="out">Bicara</button></div></div>
+              </div>
+              <div class="feed" id="feed">
+                <div class="empty"><svg><use href="#i-chat"/></svg>Belum ada percakapan. Klik <b>Mulai sesi</b> untuk mulai menerjemahkan.</div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+              <div class="card">
+                <div class="card-h"><h3>Kesiapan sistem</h3><span class="hint" id="readyHint">Semua siap</span>
+                  <div class="end"><button class="btn ghost" id="wizBtn">Panduan awal</button></div>
+                </div>
+                <div class="checks">
+                  <div class="check"><span class="st ok" id="cGpuSt">✓</span><div class="t"><b id="cGpu">GPU NVIDIA GeForce RTX 3050</b><small id="cGpuD">6 GB · driver 591.86 · CUDA siap</small></div></div>
+                  <div class="check"><span class="st ok" id="cMicSt">✓</span><div class="t"><b>Virtual mic</b><small id="cMicD">AI Translator Mic (VB-Audio Virtual Cable)</small></div><button class="btn warn" id="fixBtn" hidden>Rapikan</button></div>
+                  <div class="check"><span class="st ok">✓</span><div class="t"><b>Sampel suara Anda</b><small>15 detik · direkam 2 Okt 2026</small></div><button class="btn ghost" data-goto="speak">Ubah</button></div>
+                  <div class="check"><span class="st ok">✓</span><div class="t"><b>Model offline</b><small>Whisper small · TranslateGemma 4B · XTTS-v2</small></div></div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-h"><h3>Sesi ini</h3></div>
+                <div class="grid3" style="gap:10px">
+                  <div class="stat"><b id="stTime">00:00</b><small>Durasi</small></div>
+                  <div class="stat"><b id="stCount">0</b><small>Kalimat</small></div>
+                  <div class="stat"><b id="stLat">—</b><small>Rata-rata jeda</small></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===================== DENGAR ===================== -->
+        <section class="page" id="page-listen">
+          <div class="card">
+            <div class="card-h"><h3>Tangkap suara dari</h3><span class="hint">Hanya suara aplikasi yang dipilih yang diterjemahkan; notifikasi & musik diabaikan.</span>
+              <div class="end"><button class="btn ghost" id="refreshApps">↻ Muat ulang</button></div>
+            </div>
+            <div class="sources" id="sources">
+              <button class="src" data-app="Semua suara"><span class="logo" style="background:#64748b">∑</span><b>Semua suara</b><small>Speaker default</small><span class="eq"><i></i><i></i><i></i></span></button>
+              <button class="src on" data-app="Zoom"><span class="logo" style="background:#2d8cff">Z</span><b>Zoom</b><small>Zoom.exe</small><span class="eq"><i></i><i></i><i></i></span></button>
+              <button class="src" data-app="Chrome"><span class="logo" style="background:#ea4335">G</span><b>Chrome</b><small>Meet · YouTube</small><span class="eq"><i></i><i></i><i></i></span></button>
+              <button class="src" data-app="Teams"><span class="logo" style="background:#5b5fc7">T</span><b>Teams</b><small>ms-teams.exe</small><span class="eq"><i></i><i></i><i></i></span></button>
+              <button class="src" data-app="Discord"><span class="logo" style="background:#5865f2">D</span><b>Discord</b><small>Discord.exe</small><span class="eq"><i></i><i></i><i></i></span></button>
+              <button class="src" data-app="Edge"><span class="logo" style="background:#0f9d8a">E</span><b>Edge</b><small>msedge.exe</small><span class="eq"><i></i><i></i><i></i></span></button>
+            </div>
+          </div>
+          <div class="grid2">
+            <div class="card">
+              <div class="card-h"><h3>Bahasa</h3></div>
+              <div class="lang">
+                <select class="select"><option>Deteksi otomatis</option><option>English</option><option>日本語</option><option>中文</option></select>
+                <button class="swap">⇄</button>
+                <select class="select"><option>Bahasa Indonesia</option><option>English</option></select>
+              </div>
+              <p class="small muted" style="margin:10px 0 0">Deteksi otomatis mengenali 55 bahasa. Pilih bahasa tetap kalau pembicara hanya satu bahasa (sedikit lebih cepat & akurat).</p>
+            </div>
+            <div class="card">
+              <div class="card-h"><h3>Deteksi kalimat</h3></div>
+              <div class="meter" style="margin-bottom:12px"><div class="lv"><i data-meter="listen"></i></div><span data-meter-txt="listen">—</span></div>
+              <label class="f">Jeda akhir kalimat: <span id="pauseVal">0,6</span> dtk</label>
+              <input type="range" min="3" max="15" value="6" id="pause">
+              <p class="small muted" style="margin:6px 0 0">Lebih pendek = subtitle lebih cepat muncul, tapi kalimat bisa terpotong.</p>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>Terjemahan masuk</h3><div class="end"><button class="btn ghost" data-goto="subtitle">Atur subtitle →</button></div></div>
+            <div class="feed" data-mirror="in"><div class="empty">Belum ada suara yang diterjemahkan.</div></div>
+          </div>
+        </section>
+
+        <!-- ===================== BICARA ===================== -->
+        <section class="page" id="page-speak">
+          <div class="banner warn" id="micBanner" hidden>
+            <span class="ic">⚠</span>
+            <div class="txt"><b>Virtual mic belum dirapikan</b>Masih bernama "CABLE Output" dan ada perangkat "CABLE In 16ch" yang tidak dipakai.</div>
+            <button class="btn warn" data-fix>Rapikan (izin admin)</button>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>Alur suara</h3><span class="hint">Tahap yang sedang bekerja menyala saat sesi berjalan.</span></div>
+            <div class="flow" id="flow">
+              <div class="stage" data-stage="0"><svg><use href="#i-mic"/></svg><b>Mic Anda</b><small>Headset Mic</small></div>
+              <div class="stage" data-stage="1"><svg><use href="#i-text"/></svg><b>Teks</b><small>Whisper · 0,3 dtk</small></div>
+              <div class="stage" data-stage="2"><svg><use href="#i-globe"/></svg><b>Terjemah</b><small>Gemma · 0,7 dtk</small></div>
+              <div class="stage" data-stage="3"><svg><use href="#i-wave"/></svg><b>Suara Anda</b><small>XTTS · 0,5 dtk</small></div>
+              <div class="stage" data-stage="4"><svg><use href="#i-plug"/></svg><b>Ke rapat</b><small id="flowVmic">AI Translator Mic</small></div>
+            </div>
+          </div>
+          <div class="split">
+            <div class="card">
+              <div class="card-h"><h3>Input & bahasa</h3></div>
+              <div class="rows">
+                <div class="row-s"><div class="t"><b>Mikrofon</b><small>Gunakan headset agar suara peserta lain tidak ikut tertangkap.</small></div>
+                  <div class="ctl"><select class="select"><option>Headset Microphone (Realtek)</option><option>Mic default Windows</option></select></div></div>
+                <div class="row-s"><div class="t"><b>Level mic</b></div><div class="ctl" style="width:230px"><div class="meter" style="flex:1"><div class="lv"><i data-meter="speak"></i></div><span data-meter-txt="speak">—</span></div></div></div>
+                <div class="row-s"><div class="t"><b>Bahasa Anda → bahasa suara</b><small>Bahasa suara mengikuti yang didukung XTTS-v2 (17 bahasa).</small></div>
+                  <div class="ctl"><select class="select" style="width:110px"><option>Indonesia</option></select>→<select class="select" style="width:110px"><option>English</option><option>日本語</option><option>中文</option></select></div></div>
+                <div class="row-s"><div class="t"><b>Dengar suara terjemahan sendiri</b><small>Ikut diputar pelan di headset untuk memantau.</small></div><div class="ctl"><label class="switch"><input type="checkbox"><span></span></label></div></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-h"><h3>Sampel suara Anda</h3><span class="hint">Dipakai untuk meniru suara Anda.</span></div>
+              <div class="voice">
+                <button class="play" id="playBtn" title="Putar"><svg width="14" height="14"><use href="#i-play"/></svg></button>
+                <div class="wave" id="wave"></div>
+                <span class="small muted">0:15</span>
+              </div>
+              <div class="row-s" style="padding-bottom:0"><div class="t"><b>my_voice.wav</b><small>Direkam 2 Okt 2026 · kualitas baik</small></div>
+                <div class="ctl"><button class="btn" id="recBtn">● Rekam ulang</button><button class="btn ghost">Pilih file…</button></div></div>
+              <div class="rec-box" id="recBox">
+                <p>Bacakan teks ini dengan suara dan tempo normal:</p>
+                <blockquote>"Halo, nama saya … Saya sedang merekam suara saya untuk penerjemah otomatis. Hari ini cuacanya cerah, dan saya akan mengikuti rapat bersama tim."</blockquote>
+                <div class="ring"><span class="count" id="recCount">15</span><div class="prog"><i id="recProg"></i></div><button class="btn danger" id="recCancel">Batal</button></div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>Pakai di aplikasi rapat</h3>
+              <div class="end"><div class="seg" id="appGuideSeg"><button class="on" data-g="zoom">Zoom</button><button data-g="meet">Google Meet</button><button data-g="teams">Teams</button></div></div>
+            </div>
+            <div id="guide"></div>
+          </div>
+        </section>
+
+        <!-- ===================== SUBTITLE ===================== -->
+        <section class="page" id="page-subtitle">
+          <div class="split">
+            <div class="card">
+              <div class="card-h"><h3>Pratinjau</h3><span class="hint">Seret subtitle untuk memindahkan.</span>
+                <div class="end"><label class="switch" title="Tampilkan overlay"><input type="checkbox" checked id="ovlOn"><span></span></label></div>
+              </div>
+              <div class="stage-prev">
+                <div class="meet"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+                <div class="meet-bar"><span></span><span></span><span class="red"></span><span></span></div>
+                <div class="ovl bottom" id="ovl"><span class="tag">Overlay</span>
+                  <div class="o" id="ovlO">Let's go over the budget for next quarter.</div>
+                  <div class="tr" id="ovlT">Mari kita bahas anggaran untuk kuartal berikutnya.</div>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-h"><h3>Tampilan</h3></div>
+              <div class="rows">
+                <div class="row-s"><div class="t"><b>Posisi</b></div><div class="ctl"><div class="seg" id="posSeg"><button class="on" data-pos="bottom">Bawah</button><button data-pos="top">Atas</button></div></div></div>
+                <div class="row-s" style="display:block"><label class="f">Ukuran teks: <span id="fsVal">22</span> px</label><input type="range" min="14" max="40" value="22" id="fs"></div>
+                <div class="row-s" style="display:block"><label class="f">Gelap latar: <span id="opVal">72</span>%</label><input type="range" min="0" max="100" value="72" id="op"></div>
+                <div class="row-s"><div class="t"><b>Tampilkan teks asli</b><small>Di atas terjemahan, lebih kecil.</small></div><div class="ctl"><label class="switch"><input type="checkbox" checked id="showO"><span></span></label></div></div>
+                <div class="row-s"><div class="t"><b>Sembunyikan saat share screen</b><small>Peserta lain tidak melihat subtitle Anda.</small></div><div class="ctl"><label class="switch"><input type="checkbox" checked><span></span></label></div></div>
+                <div class="row-s"><div class="t"><b>Hilang otomatis</b><small>Subtitle memudar setelah diam.</small></div><div class="ctl"><select class="select" style="width:120px"><option>8 detik</option><option>4 detik</option><option>Tidak</option></select></div></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===================== RIWAYAT ===================== -->
+        <section class="page" id="page-history">
+          <div class="card flush">
+            <div class="hist">
+              <div class="hist-list">
+                <div class="search"><input class="input" placeholder="Cari di semua transkrip…" id="histSearch"></div>
+                <div id="histList"></div>
+              </div>
+              <div class="hist-view">
+                <div class="hd"><div><b id="hvTitle"></b><div class="small muted" id="hvMeta"></div></div>
+                  <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+                    <button class="btn" data-toast="Transkrip disalin"><svg><use href="#i-copy"/></svg>Salin</button>
+                    <button class="btn" data-toast="Disimpan sebagai .srt"><svg><use href="#i-down"/></svg>Ekspor</button>
+                    <button class="btn ghost" data-toast="Membuka folder transkrip"><svg><use href="#i-folder"/></svg></button>
+                  </div>
+                </div>
+                <div class="bd feed" id="hvBody" style="max-height:none"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===================== PENGATURAN ===================== -->
+        <section class="page" id="page-settings">
+          <div class="card">
+            <div class="card-h"><h3>Perangkat keras</h3><div class="end"><button class="btn ghost" data-toast="GPU diperiksa ulang">Periksa ulang</button></div></div>
+            <div class="gpu">
+              <div class="chipimg" id="sGpuIc">NV</div>
+              <div style="flex:1;min-width:0">
+                <b id="sGpu">NVIDIA GeForce RTX 3050</b>
+                <div class="small muted" id="sGpuD">6 GB VRAM · driver 591.86 · CUDA 12.4 siap</div>
+              </div>
+              <button class="btn warn" id="sDriverBtn" hidden>Unduh driver NVIDIA</button>
+            </div>
+            <div style="margin-top:16px">
+              <div class="row-s" style="padding:0 0 6px;border:0"><div class="t small muted">Pemakaian VRAM</div><div class="ctl small" id="sVram">1,2 / 6,0 GB</div></div>
+              <div class="vbar" id="sVbar" style="height:10px"></div>
+              <div class="legend"><span style="--c:#94a3b8">Windows</span><span style="--c:#3b82f6">Whisper</span><span style="--c:#14b8a6">TranslateGemma</span><span style="--c:#a855f7">XTTS</span></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>Pengenalan suara (Whisper)</h3><span class="hint">Model lebih besar lebih akurat, tapi lebih lambat & butuh VRAM.</span></div>
+            <div class="models" id="models"></div>
+          </div>
+          <div class="grid2">
+            <div class="card">
+              <div class="card-h"><h3>Mesin terjemahan</h3></div>
+              <div class="seg" id="engSeg" style="margin-bottom:14px"><button class="on" data-e="local">Bawaan (offline)</button><button data-e="ollama">Ollama / VPS</button></div>
+              <div id="engLocal" class="small muted">TranslateGemma 4B (Q4_K_M) berjalan di PC ini lewat llama.cpp. Tidak ada data yang keluar dari komputer.</div>
+              <div id="engOllama" hidden>
+                <label class="f">Alamat server</label><input class="input" value="http://localhost:11434" style="margin-bottom:10px">
+                <label class="f">Model</label><input class="input" value="translategemma:4b" style="margin-bottom:10px">
+                <button class="btn" data-toast="Terhubung · translategemma:4b tersedia">Tes koneksi</button>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-h"><h3>Umum</h3></div>
+              <div class="rows">
+                <div class="row-s"><div class="t"><b>XTTS di GPU</b><small>Matikan untuk hemat VRAM (suara 4× lebih lambat).</small></div><div class="ctl"><label class="switch"><input type="checkbox" checked><span></span></label></div></div>
+                <div class="row-s"><div class="t"><b>Simpan transkrip</b><small>%APPDATA%\AI Translator\transcripts</small></div><div class="ctl"><label class="switch"><input type="checkbox" checked><span></span></label></div></div>
+                <div class="row-s"><div class="t"><b>Mulai bersama Windows</b><small>Diminimalkan ke system tray.</small></div><div class="ctl"><label class="switch"><input type="checkbox"><span></span></label></div></div>
+                <div class="row-s"><div class="t"><b>Tema</b></div><div class="ctl"><div class="seg" id="themeSeg"><button data-t="light">Terang</button><button class="on" data-t="auto">Otomatis</button><button data-t="dark">Gelap</button></div></div></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===================== TENTANG ===================== -->
+        <section class="page" id="page-about">
+          <div class="grid2">
+            <div class="card">
+              <div style="display:flex;gap:14px;align-items:center;margin-bottom:14px">
+                <svg width="56" height="56"><use href="#logo"/></svg>
+                <div><b style="font-size:17px">AI Translator</b><div class="small muted">Versi 1.1.0 · offline · Windows 10/11</div></div>
+              </div>
+              <p class="small muted" style="margin:0 0 14px">Penerjemah suara real-time dua arah. Semua proses berjalan di PC Anda; audio tidak dikirim ke internet.</p>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="btn" data-toast="Membuka app.log">Buka log</button>
+                <button class="btn" data-toast="Selftest: semua model OK">Jalankan selftest</button>
+                <button class="btn ghost" data-wizard>Panduan awal</button>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-h"><h3>VB-CABLE</h3></div>
+              <p class="small" style="margin:0 0 12px">Virtual mic disediakan oleh <b>VB-CABLE</b> buatan VB-Audio Software (V. Burel). VB-CABLE adalah <i>donationware</i> — jika bermanfaat, dukung pembuatnya.</p>
+              <a class="btn" href="https://vb-audio.com/Cable/" target="_blank" rel="noopener">♥ Dukung VB-Audio</a>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>Komponen & lisensi</h3></div>
+            <div class="lic"><b>TranslateGemma 4B</b><small>Google DeepMind · model terjemahan</small><span class="tag">Gemma Terms</span></div>
+            <div class="lic"><b>XTTS-v2</b><small>Coqui · peniru suara — hanya untuk penggunaan non-komersial</small><span class="tag nc">CPML · non-komersial</span></div>
+            <div class="lic"><b>Whisper small (faster-whisper)</b><small>OpenAI · SYSTRAN · pengenal suara</small><span class="tag">MIT</span></div>
+            <div class="lic"><b>llama.cpp</b><small>ggml-org · mesin inferensi</small><span class="tag">MIT</span></div>
+            <div class="lic"><b>VB-CABLE</b><small>VB-Audio Software · virtual audio</small><span class="tag">Donationware</span></div>
+            <div class="lic"><b>PySide6 · PyTorch · CUDA</b><small>Qt · Meta · NVIDIA</small><span class="tag">LGPL · BSD · EULA</span></div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ WIZARD ============ -->
+  <div class="scrim" id="wiz" role="dialog" aria-modal="true" aria-label="Panduan awal">
+    <div class="modal">
+      <div class="steps" id="wizSteps"><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="mb">
+        <div class="wstep on">
+          <svg class="hero-ic"><use href="#logo"/></svg>
+          <h3>Selamat datang di AI Translator</h3>
+          <p class="lead">Terjemahkan rapat secara langsung — dengar orang lain lewat subtitle, dan bicara dalam bahasa lain dengan suara Anda sendiri. Semua offline di PC ini.</p>
+          <div class="checks">
+            <div class="check"><span class="st ok">1</span><div class="t"><b>Cek sistem</b><small>GPU, driver, dan virtual mic</small></div></div>
+            <div class="check"><span class="st ok">2</span><div class="t"><b>Rekam suara Anda</b><small>15 detik, untuk fitur Bicara</small></div></div>
+            <div class="check"><span class="st ok">3</span><div class="t"><b>Setujui lisensi suara</b><small>XTTS-v2 non-komersial</small></div></div>
+          </div>
+        </div>
+        <div class="wstep">
+          <h3>Cek sistem</h3>
+          <p class="lead">Memastikan PC siap menjalankan model offline.</p>
+          <div class="checks" id="wizChecks"></div>
+        </div>
+        <div class="wstep">
+          <h3>Rekam suara Anda</h3>
+          <p class="lead">Dipakai untuk meniru suara Anda saat fitur Bicara. Bisa dilewati dan dilakukan nanti.</p>
+          <blockquote style="margin:0 0 14px;padding:12px 14px;border-left:3px solid var(--speak);background:var(--sunken);border-radius:0 10px 10px 0">"Halo, nama saya … Saya sedang merekam suara saya untuk penerjemah otomatis. Hari ini cuacanya cerah, dan saya akan mengikuti rapat bersama tim."</blockquote>
+          <div class="ring"><span class="count" id="wizCount">15</span><div class="prog"><i id="wizProg"></i></div><button class="btn danger" id="wizRec">● Mulai rekam</button></div>
+        </div>
+        <div class="wstep">
+          <h3>Lisensi suara XTTS-v2</h3>
+          <p class="lead">Model peniru suara memakai Coqui Public Model License.</p>
+          <div class="lic-box">XTTS-v2 hanya boleh dipakai untuk tujuan <b>non-komersial</b>. Gunakan peniru suara hanya untuk suara Anda sendiri, atau suara orang yang sudah memberi izin. Teks lengkap: coqui.ai/cpml. TranslateGemma tunduk pada Gemma Terms of Use. VB-CABLE adalah donationware dari VB-Audio Software.</div>
+          <label class="agree"><input type="checkbox" id="wizAgree"> Saya setuju dan akan memakai peniru suara secara bertanggung jawab.</label>
+        </div>
+        <div class="wstep">
+          <svg class="hero-ic" viewBox="0 0 64 64"><circle cx="32" cy="32" r="30" fill="var(--ok-soft)"/><path d="M20 33l8 8 16-17" fill="none" stroke="var(--ok)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <h3>Siap dipakai!</h3>
+          <p class="lead">Di Zoom/Meet/Teams pilih mikrofon <b>"AI Translator Mic"</b>. Lalu klik <b>Mulai sesi</b> di aplikasi ini.</p>
+        </div>
+      </div>
+      <div class="mf">
+        <button class="btn ghost" id="wizBack">Kembali</button>
+        <span class="sp" id="wizTxt">Langkah 1 dari 5</span>
+        <button class="btn ghost" id="wizSkip">Lewati</button>
+        <button class="btn primary" id="wizNext">Lanjut</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<div class="demo">
+  <b>Simulasi kondisi:</b>
+  <span>GPU</span>
+  <div class="seg" id="demoGpu"><button class="on" data-v="ok">RTX 3050</button><button data-v="old">Driver lama</button><button data-v="none">Tanpa GPU</button></div>
+  <span>Virtual mic</span>
+  <div class="seg" id="demoMic"><button class="on" data-v="ok">Siap</button><button data-v="raw">Belum dirapikan</button><button data-v="none">Belum terpasang</button></div>
+  <button class="btn" data-wizard>Buka panduan awal</button>
+</div>
+
+<div class="notes">
+  <b>Catatan</b>
+  <ul>
+    <li><b>Beranda</b> menggabungkan kedua arah, transkrip langsung, kesiapan sistem, dan statistik sesi — cukup satu tombol <b>Mulai sesi</b> yang selalu terlihat di atas.</li>
+    <li>Menu baru: <b>Subtitle</b> (posisi, hilang otomatis), <b>Riwayat</b> (cari, salin, ekspor .srt), <b>Tentang</b> (lisensi + dukung VB-Audio), dan <b>Panduan awal</b> saat pertama kali dibuka.</li>
+    <li>Semua elemen bisa dibuat di PySide6 (QSS + beberapa widget kustom: kartu aplikasi, level meter, bar VRAM, alur suara).</li>
+  </ul>
+</div>
+
+<script>
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const win = $("#win");
+
+/* ---------- toast ---------- */
+let toastT;
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("on"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("on"), 2200); }
+$$("[data-toast]").forEach(b => b.addEventListener("click", () => toast(b.dataset.toast)));
+
+/* ---------- navigation ---------- */
+const PAGES = {
+  home: ["Beranda", "Atur arah terjemahan, lalu mulai sesi."],
+  listen: ["Dengar", "Terjemahkan suara dari aplikasi rapat menjadi subtitle."],
+  speak: ["Bicara", "Ucapan Anda diterjemahkan dan diucapkan dengan suara Anda."],
+  subtitle: ["Subtitle", "Atur tampilan subtitle melayang."],
+  history: ["Riwayat", "Transkrip semua sesi tersimpan di PC ini."],
+  settings: ["Pengaturan", "GPU, model, dan mesin terjemahan."],
+  about: ["Tentang", "Versi, lisensi, dan komponen."],
+};
+function go(p) {
+  $$(".nav").forEach(n => n.classList.toggle("on", n.dataset.page === p));
+  $$(".page").forEach(s => s.classList.toggle("on", s.id === "page-" + p));
+  $("#pTitle").textContent = PAGES[p][0]; $("#pSub").textContent = PAGES[p][1];
+}
+$$(".nav").forEach(n => n.onclick = () => go(n.dataset.page));
+$$("[data-goto]").forEach(b => b.onclick = () => go(b.dataset.goto));
+function segs(sel, fn) { $$(sel).forEach(seg => seg.querySelectorAll("button").forEach(b => b.addEventListener("click", () => { seg.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); fn && fn(b); }))); }
+
+/* ---------- theme ---------- */
+function setTheme(t) {
+  if (t === "auto") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
+  $$("#themeSeg button").forEach(b => b.classList.toggle("on", b.dataset.t === t));
+}
+$("#themeBtn").onclick = () => {
+  const r = document.documentElement;
+  const dark = r.dataset.theme ? r.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  setTheme(dark ? "light" : "dark");
+};
+segs("#themeSeg", b => setTheme(b.dataset.t));
+
+/* ---------- sources ---------- */
+$$(".src").forEach(s => s.onclick = () => { $$(".src").forEach(x => x.classList.toggle("on", x === s)); $("#routeSrc").textContent = s.dataset.app; syncPlaying(); toast("Menangkap: " + s.dataset.app); });
+$("#refreshApps").onclick = () => toast("Daftar aplikasi dimuat ulang");
+function syncPlaying() { $$(".src").forEach(x => x.classList.toggle("playing", running && x.classList.contains("on"))); }
+
+/* ---------- direction switches ---------- */
+$$("[data-dir]").forEach(c => c.onchange = () => {
+  $("#" + (c.dataset.dir === "listen" ? "dirListen" : "dirSpeak")).classList.toggle("off", !c.checked);
+  $(`[data-live="${c.dataset.dir}"]`).classList.toggle("show", c.checked);
+});
+
+/* ---------- listen pause ---------- */
+$("#pause").oninput = e => $("#pauseVal").textContent = (e.target.value / 10).toFixed(1).replace(".", ",");
+
+/* ---------- speak: wave, record, guides ---------- */
+const wave = $("#wave");
+for (let i = 0; i < 64; i++) { const b = document.createElement("i"); b.style.height = (18 + 78 * Math.abs(Math.sin(i * .55) * Math.cos(i * .19))) + "%"; wave.appendChild(b); }
+$("#playBtn").onclick = () => toast("Memutar sampel suara…");
+let recT;
+function countdown(countEl, progEl, done) {
+  let n = 15; countEl.textContent = n; progEl.style.transition = "none"; progEl.style.width = "0"; void progEl.offsetWidth; progEl.style.transition = "width 1s linear";
+  clearInterval(recT);
+  recT = setInterval(() => { n--; countEl.textContent = n; progEl.style.width = ((15 - n) / 15 * 100) + "%"; if (n <= 0) { clearInterval(recT); done(); } }, 1000);
+}
+$("#recBtn").onclick = () => { $("#recBox").classList.add("on"); countdown($("#recCount"), $("#recProg"), () => { $("#recBox").classList.remove("on"); toast("Sampel suara tersimpan (15 dtk)"); }); };
+$("#recCancel").onclick = () => { clearInterval(recT); $("#recBox").classList.remove("on"); };
+const GUIDES = {
+  zoom: ["Buka <b>Settings</b> → <b>Audio</b>.", "Di <b>Microphone</b>, pilih <kbd>AI Translator Mic</kbd>.", "Matikan <b>Automatically adjust microphone volume</b> agar suara terjemahan tidak dikecilkan."],
+  meet: ["Saat rapat, klik <b>⋮</b> → <b>Settings</b> → <b>Audio</b>.", "Di <b>Microphone</b>, pilih <kbd>AI Translator Mic</kbd>.", "Biarkan <b>Speaker</b> tetap headset Anda."],
+  teams: ["Klik <b>⋯</b> → <b>Settings</b> → <b>Devices</b>.", "Di <b>Microphone</b>, pilih <kbd>AI Translator Mic</kbd>.", "Set <b>Noise suppression</b> ke <b>Low</b> agar suara tidak terpotong."],
+};
+function guide(g) { $("#guide").innerHTML = GUIDES[g].map((t, i) => `<div class="guide"><span class="n">${i + 1}</span><div>${t}</div></div>`).join(""); }
+guide("zoom"); segs("#appGuideSeg", b => guide(b.dataset.g));
+
+/* ---------- subtitle ---------- */
+const ovl = $("#ovl");
+$("#fs").oninput = e => { ovl.style.setProperty("--fs", e.target.value + "px"); $("#fsVal").textContent = e.target.value; };
+$("#op").oninput = e => { ovl.style.setProperty("--op", e.target.value / 100); $("#opVal").textContent = e.target.value; };
+$("#showO").onchange = e => $("#ovlO").style.display = e.target.checked ? "" : "none";
+$("#ovlOn").onchange = e => ovl.style.visibility = e.target.checked ? "" : "hidden";
+segs("#posSeg", b => { ovl.style.top = ovl.style.bottom = ""; ovl.classList.toggle("top", b.dataset.pos === "top"); ovl.classList.toggle("bottom", b.dataset.pos === "bottom"); });
+ovl.addEventListener("pointerdown", e => {
+  const box = ovl.parentElement.getBoundingClientRect(), start = e.clientY - ovl.getBoundingClientRect().top;
+  ovl.setPointerCapture(e.pointerId); ovl.style.cursor = "grabbing";
+  const move = ev => { const y = Math.min(Math.max(ev.clientY - box.top - start, 6), box.height - ovl.offsetHeight - 6); ovl.classList.remove("top", "bottom"); ovl.style.bottom = "auto"; ovl.style.top = y + "px"; };
+  const up = () => { ovl.style.cursor = ""; ovl.removeEventListener("pointermove", move); $$("#posSeg button").forEach(x => x.classList.remove("on")); };
+  ovl.addEventListener("pointermove", move); ovl.addEventListener("pointerup", up, { once: true });
+});
+
+/* ---------- history ---------- */
+const HIST = [
+  { t: "Rapat mingguan tim", d: "Hari ini · 18:14", dur: "38 mnt", n: 42, pair: "EN → ID", lines: [["in", "Let's start with last week's numbers.", "Mari kita mulai dengan angka minggu lalu.", "18:14:05"], ["in", "Revenue grew by twelve percent.", "Pendapatan tumbuh dua belas persen.", "18:14:19"], ["out", "Apakah itu termasuk proyek baru?", "Does that include the new project?", "18:14:31"], ["in", "Yes, the new project is included.", "Ya, proyek baru sudah termasuk.", "18:14:40"]] },
+  { t: "Webinar produk", d: "Kemarin · 09:30", dur: "1 j 12 mnt", n: 118, pair: "JA → ID", lines: [["in", "本日はお集まりいただきありがとうございます。", "Terima kasih sudah hadir hari ini.", "09:30:12"], ["in", "新しい機能を紹介します。", "Saya akan memperkenalkan fitur baru.", "09:30:25"]] },
+  { t: "Call klien Singapura", d: "30 Sep · 15:02", dur: "22 mnt", n: 27, pair: "ID ⇄ EN", lines: [["out", "Selamat siang, terima kasih atas waktunya.", "Good afternoon, thank you for your time.", "15:02:10"], ["in", "Happy to be here. Shall we begin?", "Senang bisa hadir. Kita mulai?", "15:02:18"]] },
+  { t: "Kelas bahasa Korea", d: "28 Sep · 19:00", dur: "55 mnt", n: 64, pair: "KO → ID", lines: [["in", "오늘은 인사말을 배워 봅시다.", "Hari ini mari belajar salam.", "19:00:31"]] },
+];
+let histSel = 0;
+function msgHtml([dir, o, tr, time, meta]) {
+  return `<div class="msg ${dir}" data-dir="${dir}"><div class="av"><svg width="15" height="15"><use href="#i-${dir === "in" ? "ear" : "mic"}"/></svg></div><div><div class="o"></div><div class="tr"></div>${meta ? `<div class="meta">${meta}</div>` : ""}</div><time>${time}</time></div>`;
+}
+function fillMsg(el, o, tr) { el.querySelector(".o").textContent = o; el.querySelector(".tr").textContent = tr; }
+function renderHist(q = "") {
+  const list = $("#histList"); list.innerHTML = "";
+  HIST.forEach((h, i) => {
+    if (q && !(h.t + h.lines.map(l => l[1] + l[2]).join(" ")).toLowerCase().includes(q.toLowerCase())) return;
+    const el = document.createElement("div"); el.className = "hist-item" + (i === histSel ? " on" : "");
+    el.innerHTML = `<b></b><small>${h.d} · ${h.dur}</small><div class="tags"><span class="tag">${h.pair}</span><span class="tag">${h.n} kalimat</span></div>`;
+    el.querySelector("b").textContent = h.t;
+    el.onclick = () => { histSel = i; renderHist(q); };
+    list.appendChild(el);
+  });
+  const h = HIST[histSel];
+  $("#hvTitle").textContent = h.t; $("#hvMeta").textContent = `${h.d} · ${h.dur} · ${h.pair}`;
+  const body = $("#hvBody"); body.innerHTML = "";
+  h.lines.forEach(l => { const w = document.createElement("div"); w.innerHTML = msgHtml(l); const m = w.firstChild; fillMsg(m, l[1], l[2]); body.appendChild(m); });
+}
+renderHist(); $("#histSearch").oninput = e => renderHist(e.target.value);
+
+/* ---------- settings ---------- */
+const MODELS = [["tiny", "75 MB", 1, 5], ["base", "145 MB", 2, 4], ["small", "480 MB", 3, 4], ["medium", "1,5 GB", 4, 2], ["large-v3-turbo", "1,6 GB", 5, 3]];
+$("#models").innerHTML = MODELS.map(([n, s, a, sp]) => `<button class="model${n === "small" ? " on" : ""}" data-m="${n}"><b>${n}</b><small>${s}${n === "small" ? " · disarankan" : ""}</small>
+  <small style="margin-top:6px">Akurasi</small><div class="bars acc">${[1, 2, 3, 4, 5].map(i => `<i class="${i <= a ? "f" : ""}"></i>`).join("")}</div>
+  <small style="margin-top:4px">Kecepatan</small><div class="bars spd">${[1, 2, 3, 4, 5].map(i => `<i class="${i <= sp ? "f" : ""}"></i>`).join("")}</div></button>`).join("");
+$$(".model").forEach(m => m.onclick = () => { $$(".model").forEach(x => x.classList.toggle("on", x === m)); toast("Whisper " + m.dataset.m + " dipakai di sesi berikutnya"); });
+segs("#engSeg", b => { $("#engLocal").hidden = b.dataset.e !== "local"; $("#engOllama").hidden = b.dataset.e !== "ollama"; });
+
+/* ---------- VRAM ---------- */
+const VCOL = ["#94a3b8", "#3b82f6", "#14b8a6", "#a855f7"];
+function vram(parts) {
+  const html = parts.map((v, i) => `<i style="width:${v / 6 * 100}%;background:${VCOL[i]}"></i>`).join("");
+  $("#hVbar").innerHTML = html; $("#sVbar").innerHTML = html;
+  const txt = parts.reduce((a, b) => a + b, 0).toFixed(1).replace(".", ",") + " / 6,0 GB";
+  $("#hVram").textContent = txt; $("#sVram").textContent = txt;
+}
+vram([1.2]);
+
+/* ---------- demo states ---------- */
+let gpuState = "ok", micState = "ok";
+function applyStates() {
+  const g = gpuState;
+  $("#gpuBanner").hidden = g === "ok";
+  $("#gpuBannerBtn").hidden = g !== "old";
+  $("#sDriverBtn").hidden = g !== "old";
+  $("#setBadge").hidden = g === "ok";
+  if (g === "old") { $("#gpuBannerT").textContent = "Driver NVIDIA terlalu lama (531.20)"; $("#gpuBannerD").textContent = "Disarankan 551.61 atau lebih baru. Tanpa pembaruan, aplikasi bisa jalan di CPU dan lambat."; }
+  if (g === "none") { $("#gpuBannerT").textContent = "Tidak ada GPU NVIDIA"; $("#gpuBannerD").textContent = "Aplikasi jalan di CPU: subtitle tertunda ±5 detik, fitur Bicara tidak disarankan."; }
+  const gpuTxt = { ok: ["NVIDIA GeForce RTX 3050", "6 GB · driver 591.86 · CUDA siap", "ok", "✓"], old: ["NVIDIA GeForce GTX 1660", "6 GB · driver 531.20 · perlu diperbarui", "warn", "!"], none: ["Tanpa GPU NVIDIA", "Mode CPU · Intel UHD Graphics 730", "bad", "!"] }[g];
+  $("#cGpu").textContent = g === "none" ? gpuTxt[0] : "GPU " + gpuTxt[0]; $("#cGpuD").textContent = gpuTxt[1];
+  $("#cGpuSt").className = "st " + gpuTxt[2]; $("#cGpuSt").textContent = gpuTxt[3];
+  $("#sGpu").textContent = gpuTxt[0]; $("#sGpuD").textContent = gpuTxt[1];
+  $("#hGpu").textContent = { ok: "RTX 3050", old: "Driver lama", none: "CPU" }[g];
+  $("#hGpuDot").className = "dot " + gpuTxt[2];
+
+  const m = micState;
+  $("#micBanner").hidden = m === "ok";
+  $("#speakBadge").hidden = m === "ok";
+  $("#fixBtn").hidden = m === "ok";
+  $("#fixBtn").textContent = m === "none" ? "Pasang" : "Rapikan";
+  const micTxt = { ok: ["AI Translator Mic (VB-Audio Virtual Cable)", "ok", "✓", "Siap", "AI Translator Mic"], raw: ["CABLE Output (VB-Audio Virtual Cable) — belum dirapikan", "warn", "!", "Rapikan", "CABLE Output"], none: ["Belum terpasang — fitur Bicara tidak bisa dipakai", "bad", "!", "Tidak ada", "—"] }[m];
+  $("#cMicD").textContent = micTxt[0]; $("#cMicSt").className = "st " + micTxt[1]; $("#cMicSt").textContent = micTxt[2];
+  $("#hMic").textContent = micTxt[3]; $("#hMicDot").className = "dot " + micTxt[1];
+  $("#routeVmic").textContent = micTxt[4]; $("#flowVmic").textContent = micTxt[4];
+  const mb = $("#micBanner .txt");
+  mb.innerHTML = m === "none" ? "<b>Virtual mic belum terpasang</b>Pasang VB-CABLE (sekali, butuh restart) agar suara terjemahan bisa masuk ke Zoom/Meet." : "<b>Virtual mic belum dirapikan</b>Masih bernama \"CABLE Output\" dan ada perangkat \"CABLE In 16ch\" yang tidak dipakai.";
+  $("#micBanner [data-fix]").textContent = m === "none" ? "Pasang VB-CABLE" : "Rapikan (izin admin)";
+  const issues = (g !== "ok") + (m !== "ok");
+  $("#readyHint").textContent = issues ? issues + " perlu perhatian" : "Semua siap";
+}
+segs("#demoGpu", b => { gpuState = b.dataset.v; applyStates(); });
+segs("#demoMic", b => { micState = b.dataset.v; applyStates(); });
+function fixMic() {
+  toast(micState === "none" ? "Memasang VB-CABLE… restart diperlukan" : "Perangkat dirapikan: AI Translator Mic");
+  micState = "ok"; $$("#demoMic button").forEach(x => x.classList.toggle("on", x.dataset.v === "ok")); applyStates();
+}
+$("#fixBtn").onclick = fixMic; $$("[data-fix]").forEach(b => b.onclick = fixMic);
+$("#gpuBannerBtn").onclick = $("#sDriverBtn").onclick = () => toast("Membuka nvidia.com/Download");
+applyStates();
+
+/* ---------- session simulation ---------- */
+const LINES = [
+  ["in", "Good morning everyone, thanks for joining.", "Selamat pagi semuanya, terima kasih sudah bergabung.", 381, 277],
+  ["in", "Today we will discuss the budget for next year.", "Hari ini kita akan membahas anggaran untuk tahun depan.", 275, 648],
+  ["out", "Baik, saya sudah siapkan ringkasannya.", "Okay, I have prepared the summary.", 310, 402],
+  ["in", "Great. Could you share your screen?", "Bagus. Bisakah Anda membagikan layar?", 296, 351],
+  ["out", "Tentu, tunggu sebentar.", "Sure, one moment.", 240, 288],
+  ["in", "I can see it now, please go ahead.", "Sekarang sudah terlihat, silakan lanjut.", 301, 333],
+];
+let running = false, timers = [], lvT, clockT, t0, count = 0, latSum = 0;
+const fmt = s => String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+function setBtn(run) {
+  const b = $("#sessBtn");
+  b.classList.toggle("stop", run);
+  b.innerHTML = run ? '<svg><use href="#i-stop"/></svg><span>Berhenti</span>' : '<svg><use href="#i-play"/></svg><span>Mulai sesi</span>';
+}
+function meters(on) {
+  clearInterval(lvT);
+  if (!on) { $$("[data-meter]").forEach(m => m.style.width = "0"); $$("[data-meter-txt]").forEach(m => m.textContent = "—"); return; }
+  lvT = setInterval(() => {
+    const v = { listen: 15 + Math.random() * 65, speak: Math.random() < .35 ? 12 + Math.random() * 60 : 3 };
+    $$("[data-meter]").forEach(m => m.style.width = v[m.dataset.meter] + "%");
+    $$("[data-meter-txt]").forEach(m => m.textContent = Math.round(-60 + v[m.dataset.meterTxt] * .55) + " dB");
+  }, 140);
+}
+function addLine([dir, o, tr, asr, mt]) {
+  const time = new Date().toTimeString().slice(0, 8);
+  const meta = `<b>${dir === "in" ? "EN" : "ID"}</b><span>suara→teks ${asr} ms · terjemah ${mt} ms</span>`;
+  [["#feed", true], [`[data-mirror="${dir}"]`, false]].forEach(([sel]) => {
+    const feed = $(sel); if (!feed) return;
+    if (feed.querySelector(".empty")) feed.innerHTML = "";
+    const w = document.createElement("div"); w.innerHTML = msgHtml([dir, o, tr, time, meta]); const m = w.firstChild; fillMsg(m, o, tr);
+    const f = $("#feed [data-f].on, [data-filter] .on")?.dataset.f;
+    if (sel === "#feed" && f && f !== "all" && f !== dir) m.style.display = "none";
+    feed.appendChild(m); feed.scrollTop = feed.scrollHeight;
+  });
+  if (dir === "in") { $("#ovlO").textContent = o; $("#ovlT").textContent = tr; }
+  else { $$(".stage").forEach((s, i) => timers.push(setTimeout(() => { $$(".stage").forEach(x => x.classList.remove("active")); s.classList.add("active"); }, i * 260))); timers.push(setTimeout(() => $$(".stage").forEach(x => x.classList.remove("active")), 1500)); }
+  count++; latSum += asr + mt;
+  $("#stCount").textContent = count; $("#stLat").textContent = (latSum / count / 1000).toFixed(1).replace(".", ",") + " dtk";
+}
+segs("[data-filter]", b => $$("#feed .msg").forEach(m => m.style.display = b.dataset.f === "all" || b.dataset.f === m.dataset.dir ? "" : "none"));
+
+$("#sessBtn").onclick = () => {
+  timers.forEach(clearTimeout); timers = [];
+  if (running || win.classList.contains("loading")) {
+    running = false; win.classList.remove("running", "loading"); setBtn(false);
+    $("#sessTxt").textContent = "Berhenti"; meters(false); clearInterval(clockT); vram([1.2]); syncPlaying();
+    toast("Sesi berhenti · transkrip tersimpan");
+    return;
+  }
+  if (micState === "none" && $('[data-dir="speak"]').checked) { toast("Virtual mic belum terpasang — fitur Bicara dimatikan untuk sesi ini"); }
+  win.classList.add("loading"); setBtn(true);
+  const steps = gpuState === "none" ? ["Memuat TranslateGemma (CPU)…", "Memuat Whisper (CPU)…", "Memanaskan…"] : ["Memuat TranslateGemma…", "Memuat Whisper…", "Memanaskan XTTS…"];
+  steps.forEach((s, i) => timers.push(setTimeout(() => { $("#sessTxt").textContent = s; vram([[1.2, .9], [1.2, .9, 2.6], [1.2, .9, 2.6, 1.2]][i].map(v => gpuState === "none" ? (v === 1.2 ? 1.2 : 0) : v)); }, i * 550)));
+  timers.push(setTimeout(() => {
+    win.classList.remove("loading"); win.classList.add("running"); running = true; syncPlaying();
+    t0 = Date.now(); count = 0; latSum = 0;
+    clockT = setInterval(() => { const s = Math.floor((Date.now() - t0) / 1000); $("#sessTxt").textContent = "Berjalan · " + fmt(s); $("#stTime").textContent = fmt(s); }, 500);
+    meters(true);
+    LINES.forEach((l, i) => { if (l[0] === "out" && (!$('[data-dir="speak"]').checked || micState === "none")) return; if (l[0] === "in" && !$('[data-dir="listen"]').checked) return; timers.push(setTimeout(() => addLine(l), 900 + i * 1800)); });
+  }, steps.length * 550 + 300));
+};
+
+/* ---------- wizard ---------- */
+let wstep = 0;
+const wiz = $("#wiz"), WN = 5;
+function wizShow() {
+  $$(".wstep").forEach((s, i) => s.classList.toggle("on", i === wstep));
+  $$("#wizSteps i").forEach((s, i) => s.classList.toggle("done", i <= wstep));
+  $("#wizTxt").textContent = `Langkah ${wstep + 1} dari ${WN}`;
+  $("#wizBack").style.visibility = wstep ? "" : "hidden";
+  $("#wizSkip").style.display = wstep === 2 ? "" : "none";
+  $("#wizNext").textContent = wstep === WN - 1 ? "Mulai pakai" : "Lanjut";
+  $("#wizNext").disabled = wstep === 3 && !$("#wizAgree").checked;
+  $("#wizNext").style.opacity = $("#wizNext").disabled ? .5 : 1;
+  if (wstep === 1) runChecks();
+}
+function runChecks() {
+  const items = [["GPU NVIDIA", gpuState === "none" ? ["bad", "Tidak ada — aplikasi jalan di CPU"] : gpuState === "old" ? ["warn", "Driver 531.20 perlu diperbarui"] : ["ok", "RTX 3050 · 6 GB · driver 591.86"]],
+    ["Virtual mic", micState === "none" ? ["bad", "Belum terpasang"] : micState === "raw" ? ["warn", "Perlu dirapikan"] : ["ok", "AI Translator Mic"]],
+    ["Model offline", ["ok", "Whisper · TranslateGemma · XTTS-v2"]],
+    ["Ruang disk", ["ok", "17 GB kosong"]]];
+  const box = $("#wizChecks"); box.innerHTML = "";
+  items.forEach(([n], i) => box.insertAdjacentHTML("beforeend", `<div class="check"><span class="st" id="wc${i}">…</span><div class="t"><b>${n}</b><small id="wcd${i}">Memeriksa…</small></div></div>`));
+  items.forEach(([, [st, d]], i) => setTimeout(() => { const s = $("#wc" + i); if (!s) return; s.className = "st " + st; s.textContent = st === "ok" ? "✓" : "!"; $("#wcd" + i).textContent = d; }, 400 + i * 350));
+}
+function openWiz() { wstep = 0; wiz.classList.add("on"); wizShow(); }
+$$("[data-wizard]").forEach(b => b.onclick = openWiz); $("#wizBtn").onclick = openWiz;
+$("#wizBack").onclick = () => { wstep = Math.max(0, wstep - 1); wizShow(); };
+$("#wizSkip").onclick = () => { wstep++; wizShow(); };
+$("#wizNext").onclick = () => { if (wstep === WN - 1) { wiz.classList.remove("on"); toast("Siap! Klik Mulai sesi kapan saja"); return; } wstep++; wizShow(); };
+$("#wizAgree").onchange = wizShow;
+$("#wizRec").onclick = () => countdown($("#wizCount"), $("#wizProg"), () => { toast("Sampel suara tersimpan"); wstep++; wizShow(); });
+wiz.onclick = e => { if (e.target === wiz) wiz.classList.remove("on"); };
+document.addEventListener("keydown", e => { if (e.key === "Escape") wiz.classList.remove("on"); });
+openWiz();
+</script>
+</body>
+</html>

@@ -60,6 +60,14 @@ def selftest():
 
 def main():
     _setup_logging()
+    if "--setup-audio" in sys.argv:
+        # Dipanggil installer (sudah admin) atau dari UI lewat UAC.
+        from app import audio_setup
+
+        ok = audio_setup.is_installed() and audio_setup.configure(log=lambda m: print("[setup-audio]", m))
+        print("[setup-audio]", "SELESAI" if ok else "GAGAL / VB-CABLE belum siap (mungkin perlu restart)")
+        sys.stdout.flush()
+        os._exit(0 if ok else 1)
     if "--selftest" in sys.argv:
         selftest()
         # Thread latar dari torch/TTS kadang menahan proses .exe agar tidak keluar.

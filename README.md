@@ -27,14 +27,15 @@ BICARA : mic Anda → Whisper → TranslateGemma 4B → XTTS-v2 (suara tiruan An
 | GPU | NVIDIA, VRAM 6 GB, driver terbaru. Tanpa GPU tetap jalan di CPU, tapi lambat |
 | RAM | 16 GB |
 | Disk | ~10 GB |
-| Lainnya | Headset disarankan untuk fitur Bicara, plus [VB-Audio Virtual Cable](https://vb-audio.com/Cable/) (gratis) |
+| Lainnya | Headset disarankan untuk fitur Bicara. Virtual mic (VB-CABLE) sudah ikut terpasang lewat installer |
 
 ## Instalasi (pengguna)
 
 1. Salin **kedua file installer** ke satu folder: `AI-Translator-Setup-1.0.0.exe` dan `AI-Translator-Setup-1.0.0-1.bin`.
    Flashdisk harus berformat NTFS atau exFAT, karena FAT32 tidak bisa menyimpan file di atas 4 GB.
 2. Jalankan `AI-Translator-Setup-1.0.0.exe` → Next → Finish. Tidak perlu internet.
-3. Langkah ini hanya untuk fitur **Bicara**: instal VB-Audio Virtual Cable (klik kanan → *Run as administrator*), lalu restart PC.
+3. Pilihan **"Pasang virtual mic (VB-CABLE)"** sudah tercentang. Installer memasangnya, memberi nama **"AI Translator Mic"**,
+   dan menyembunyikan perangkat VB-CABLE yang tidak dipakai. Setelah Finish, **restart PC** satu kali.
 
 ## Cara pakai
 
@@ -45,7 +46,8 @@ BICARA : mic Anda → Whisper → TranslateGemma 4B → XTTS-v2 (suara tiruan An
 
 **Bicara (terjemahkan suara Anda)**
 1. Centang fitur Bicara, pilih mikrofon, lalu klik **● Rekam 15 dtk** untuk membuat sampel suara.
-2. Klik **▶ Mulai**. Di Zoom/Meet/Teams, pilih mikrofon **"CABLE Output (VB-Audio Virtual Cable)"**.
+2. Klik **▶ Mulai**. Di Zoom/Meet/Teams, pilih mikrofon **"AI Translator Mic"**.
+   Kalau namanya masih "CABLE Output", klik **Rapikan perangkat VB-CABLE** di tab Bicara (butuh izin admin sekali).
 
 Pengaturan, transkrip, sampel suara, dan log disimpan di `%APPDATA%\AI Translator`.
 
@@ -88,6 +90,7 @@ Model dan llama.cpp **tidak disimpan di git** karena ukurannya beberapa GB.
 | `models/translategemma/` | `translategemma-4b-it.Q4_K_M.gguf` | [mradermacher/translategemma-4b-it-GGUF](https://huggingface.co/mradermacher/translategemma-4b-it-GGUF) |
 | `models/whisper/faster-whisper-small/` | Whisper small (CTranslate2) | [Systran/faster-whisper-small](https://huggingface.co/Systran/faster-whisper-small) |
 | `models/tts/` | XTTS-v2 (opsi `--xtts`, lisensi CPML) | Coqui |
+| `vendor/vbcable/` | Paket resmi VB-CABLE Driver Pack 45 | [vb-audio.com/Cable](https://vb-audio.com/Cable/) |
 | `vendor/llama/` | llama.cpp `b11344` win-cuda-12.4-x64 + cudart | [ggml-org/llama.cpp releases](https://github.com/ggml-org/llama.cpp/releases/tag/b11344) |
 
 ### Struktur kode
@@ -98,6 +101,7 @@ Model dan llama.cpp **tidak disimpan di git** karena ukurannya beberapa GB.
 | `app/config.py` | Pengaturan (`config.json`), path `APP_DIR` (read-only) dan `DATA_DIR` (bisa ditulis) |
 | `app/audio_capture.py` | Loopback/mic via WASAPI, pemutar ke virtual mic, rekam sampel |
 | `app/process_loopback.py` | Tangkap audio satu aplikasi (WASAPI process loopback, ctypes) |
+| `app/audio_setup.py` | Merapikan VB-CABLE: ganti nama mic/speaker, nonaktifkan CABLE In 16ch (`--setup-audio`) |
 | `app/gpu_check.py` | Deteksi GPU NVIDIA, versi driver, dan VRAM |
 | `app/segmenter.py` | VAD berbasis energi, memotong audio per kalimat |
 | `app/asr.py` · `app/translator.py` · `app/tts.py` | Whisper · TranslateGemma (llama-server / Ollama) · XTTS-v2 |
@@ -122,6 +126,8 @@ Kode aplikasi: tentukan sendiri (misalnya MIT). Komponen pihak ketiga punya lise
 
 - **XTTS-v2**: Coqui Public Model License, **hanya untuk penggunaan non-komersial**.
 - **TranslateGemma**: Gemma Terms of Use.
-- **VB-Audio Cable** tidak dibundel. Pengguna mengunduhnya sendiri.
+- **VB-CABLE** (VB-Audio Software) adalah *donationware*. Paket resminya ikut di installer tanpa perubahan.
+  Kalau bermanfaat, [dukung pembuatnya](https://vb-audio.com/Cable/). Sebelum didistribusikan luas, minta persetujuan VB-Audio dulu
+  (readme paketnya mensyaratkan izin untuk *integrasi ke installer lain*).
 
 Gunakan fitur peniru suara hanya untuk suara Anda sendiri, atau suara orang yang sudah memberi izin.

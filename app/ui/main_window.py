@@ -26,7 +26,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .. import gpu_check
+from .. import audio_setup, gpu_check
 from ..audio_capture import list_input_devices, list_loopback_devices, list_output_devices, record_sample
 from ..config import TRANSCRIPT_DIR
 from ..languages import LANGUAGES, language_name
@@ -248,21 +248,26 @@ class MainWindow(QMainWindow):
         form.addRow("Terjemahkan ke:", self.speak_tgt_combo)
 
         self.vmic_combo = QComboBox()
-        outputs = self._safe_devices(list_output_devices)
-        for name in outputs:
+        self.vmic_combo.addItem("Otomatis (VB-CABLE)", "")
+        for name in self._safe_devices(list_output_devices):
             self.vmic_combo.addItem(name, name)
         self._select(self.vmic_combo, self.cfg.virtual_mic_device)
         form.addRow("Kirim ke (virtual mic):", self.vmic_combo)
-        if not any("VB-Audio" in name for name in outputs):
-            warn = QLabel(
-                "⚠ VB-Audio Virtual Cable belum terinstal. Unduh gratis di "
-                '<a href="https://vb-audio.com/Cable/">vb-audio.com/Cable</a>, '
-                "instal (klik kanan → Run as administrator), restart PC, lalu buka aplikasi ini lagi."
+
+        self.vmic_status = QLabel()
+        self.vmic_status.setWordWrap(True)
+        self.vmic_status.setOpenExternalLinks(True)
+        self.vmic_fix_btn = QPushButton("Rapikan perangkat VB-CABLE")
+        self.vmic_fix_btn.setToolTip(
+            "Ganti nama mic menjadi \"{}\" dan sembunyikan \"CABLE In 16ch\" (butuh izin admin sekali).".format(
+                audio_setup.MIC_NAME
             )
-            warn.setOpenExternalLinks(True)
-            warn.setWordWrap(True)
-            warn.setStyleSheet("color: #d9822b;")
-            form.addRow(warn)
+        )
+        self.vmic_fix_btn.clicked.connect(self._fix_vmic)
+        vmic_row = QHBoxLayout()
+        vmic_row.addWidget(self.vmic_status, 1)
+        vmic_row.addWidget(self.vmic_fix_btn)
+        form.addRow(vmic_row)
 
         voice_row = QHBoxLayout()
         self.voice_edit = QLineEdit(self.cfg.voice_sample)
@@ -282,15 +287,49 @@ class MainWindow(QMainWindow):
         form.addRow("XTTS jalan di:", self.tts_device_combo)
         v.addWidget(self.speak_box)
 
-        help_label = QLabel(
-            "Cara pakai di Zoom/Meet/Teams: pilih mikrofon <b>\"CABLE Output (VB-Audio Virtual Cable)\"</b>.<br>"
-            "Gunakan <b>headset</b> agar suara peserta lain tidak ikut tertangkap mic Anda.<br>"
-            "Model suara: XTTS-v2 (lisensi non-komersial)."
-        )
-        help_label.setWordWrap(True)
-        v.addWidget(help_label)
+        self.speak_help = QLabel()
+        self.speak_help.setWordWrap(True)
+        self.speak_help.setOpenExternalLinks(True)
+        v.addWidget(self.speak_help)
         v.addStretch()
+        self._refresh_vmic()
         return tab
+
+    def _refresh_vmic(self):
+        try:
+            installed, configured, mic = audio_setup.is_installed(), audio_setup.is_configured(), audio_setup.mic_name()
+        except OSError:
+            installed = configured = False
+            mic = ""
+        if not installed:
+            self.vmic_status.setText(
+                "⚠ Virtual mic belum terpasang. Instal ulang AI Translator dengan opsi <b>VB-CABLE</b> dicentang, "
+                'atau pasang manual dari <a href="https://vb-audio.com/Cable/">vb-audio.com/Cable</a>, lalu restart PC.'
+            )
+            self.vmic_status.setStyleSheet("color: #d9822b;")
+        else:
+            self.vmic_status.setText("✓ Virtual mic siap: <b>{}</b>".format(mic))
+            self.vmic_status.setStyleSheet("")
+        self.vmic_fix_btn.setVisible(installed and not configured)
+        self.speak_help.setText(
+            "Di Zoom/Meet/Teams pilih mikrofon <b>\"{}\"</b>. "
+            "Gunakan <b>headset</b> agar suara peserta lain tidak ikut tertangkap mic Anda.<br>"
+            "Virtual mic: VB-CABLE oleh VB-Audio (donationware, "
+            '<a href="https://vb-audio.com/Cable/">dukung pembuatnya</a>). '
+            "Model suara: XTTS-v2 (lisensi non-komersial).".format(mic or audio_setup.MIC_NAME)
+        )
+
+    def _fix_vmic(self):
+        if audio_setup.is_admin():
+            audio_setup.configure()
+        elif not audio_setup.configure_elevated():
+            self.status_label.setText("Izin admin ditolak, perangkat VB-CABLE tidak dirapikan.")
+            return
+        self._refresh_vmic()
+        self.status_label.setText(
+            "Perangkat VB-CABLE dirapikan." if audio_setup.is_configured()
+            else "Gagal merapikan perangkat VB-CABLE (lihat app.log)."
+        )
 
     def _build_engine_tab(self):
         tab = QWidget()

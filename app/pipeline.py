@@ -12,7 +12,7 @@ import time
 from dataclasses import dataclass
 
 from . import gpu_check
-from .audio_capture import TARGET_SR, AudioPlayer, InputCapture
+from .audio_capture import TARGET_SR, AudioPlayer, InputCapture, list_output_devices
 from .config import BUILTIN_MT_MODEL, LLAMA_SERVER, TRANSCRIPT_DIR
 from .segmenter import SpeechSegmenter
 
@@ -138,6 +138,19 @@ class _VoiceOutput:
         self.player.close()
 
 
+def _virtual_mic(cfg):
+    """Perangkat output untuk suara terjemahan: pilihan pengguna, atau speaker VB-CABLE yang terdeteksi."""
+    from . import audio_setup
+
+    names = list_output_devices()
+    if cfg.virtual_mic_device in names:
+        return cfg.virtual_mic_device
+    auto = audio_setup.speaker_name()
+    if auto in names:
+        return auto
+    raise RuntimeError("Virtual mic (VB-CABLE) tidak ditemukan. Instal ulang AI Translator dengan opsi VB-CABLE, lalu restart PC.")
+
+
 def _listen_capture(on_audio, cfg):
     if cfg.loopback_app:
         from .process_loopback import ProcessLoopbackCapture
@@ -237,7 +250,7 @@ class Session:
             probe = InputCapture(lambda _: None, cfg.mic_device, loopback=False)
             probe.start()
             probe.stop()
-            AudioPlayer(cfg.virtual_mic_device).close()
+            AudioPlayer(_virtual_mic(cfg)).close()
 
         if cfg.translator_backend == "ollama":
             self.status("Memeriksa Ollama ({})...".format(cfg.ollama_url))
@@ -262,7 +275,7 @@ class Session:
 
             self.status("Memuat XTTS-v2 (pertama kali mengunduh ~1,8 GB)...")
             tts = VoiceCloner(cfg.voice_sample, cfg.tts_device if gpu.has_cuda else "cpu", log=self.status)
-            player = AudioPlayer(cfg.virtual_mic_device)
+            player = AudioPlayer(_virtual_mic(cfg))
             voice = self._voice = _VoiceOutput(self, tts, player, cfg.speak_target_language)
             voice.start()
 

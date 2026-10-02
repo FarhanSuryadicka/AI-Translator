@@ -23,8 +23,12 @@ Anda setuju mematuhi lisensi masing-masing.
    bersama PyTorch), Qt for Python / PySide6 (LGPLv3), coqui-tts (MPL-2.0),
    CTranslate2 (MIT), PortAudio/PyAudioWPatch (MIT).
 
-Fitur "Bicara -> virtual mic" membutuhkan VB-Audio Virtual Cable
-(https://vb-audio.com/Cable/), yang diinstal terpisah oleh pengguna.
+Fitur "Bicara -> virtual mic" memakai VB-CABLE Virtual Audio Device oleh
+VB-Audio Software (V.Burel), https://vb-cable.com. VB-CABLE adalah DONATIONWARE:
+jika bermanfaat, dukung pembuatnya di https://vb-audio.com/Cable/.
+Paket resminya disertakan tanpa perubahan dan dipasang opsional oleh installer.
+Setelah terpasang, nama perangkatnya diganti menjadi "AI Translator Mic" /
+"AI Translator Speaker", dan "CABLE In 16ch" dinonaktifkan.
 
 Gunakan fitur peniru suara hanya untuk suara Anda sendiri, atau suara orang
 yang telah memberi izin.

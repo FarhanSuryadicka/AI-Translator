@@ -49,14 +49,21 @@ BICARA : mic Anda → Whisper → TranslateGemma 4B → XTTS-v2 (suara tiruan An
 
 Pengaturan, transkrip, sampel suara, dan log disimpan di `%APPDATA%\AI Translator`.
 
-## Performa (RTX 3050 6 GB)
+## Performa
 
-| Tahap | Waktu per kalimat |
-|---|---|
-| Whisper small (ASR) | ~0,3–0,65 dtk |
-| TranslateGemma 4B Q4_K_M (llama.cpp) | ~0,3–0,9 dtk |
-| XTTS-v2, sampai suara pertama keluar | ~0,75 dtk |
-| VRAM total, semua fitur aktif (termasuk Windows) | ~5,9 GB |
+Diukur dengan satu kalimat berdurasi 5,7 detik, di RTX 3050 6 GB dibandingkan dengan CPU saja (i5-12400F):
+
+| Tahap | GPU | CPU saja |
+|---|---|---|
+| Whisper small (ucapan → teks) | 0,3 dtk | 1,6 dtk |
+| TranslateGemma 4B Q4_K_M | 0,3–0,9 dtk | 1,1–3,3 dtk |
+| **Dengar: sampai subtitle muncul** | **~1,2 dtk** | **~5 dtk** |
+| XTTS-v2: membuat 4 dtk suara | 2,6 dtk (real-time) | 12 dtk (patah-patah) |
+
+VRAM total dengan semua fitur aktif (termasuk Windows) sekitar 5,9 GB.
+Saat dibuka, aplikasi memeriksa GPU dan driver NVIDIA. Kalau tidak ada GPU NVIDIA, atau drivernya belum terpasang
+atau terlalu lama (driver minimum 551.61 untuk CUDA 12.4), aplikasi menampilkan peringatan beserta tombol *Unduh driver NVIDIA*.
+Model otomatis dijalankan di CPU kalau GPU tidak tersedia.
 
 ## Untuk developer
 
@@ -91,6 +98,7 @@ Model dan llama.cpp **tidak disimpan di git** karena ukurannya beberapa GB.
 | `app/config.py` | Pengaturan (`config.json`), path `APP_DIR` (read-only) dan `DATA_DIR` (bisa ditulis) |
 | `app/audio_capture.py` | Loopback/mic via WASAPI, pemutar ke virtual mic, rekam sampel |
 | `app/process_loopback.py` | Tangkap audio satu aplikasi (WASAPI process loopback, ctypes) |
+| `app/gpu_check.py` | Deteksi GPU NVIDIA, versi driver, dan VRAM |
 | `app/segmenter.py` | VAD berbasis energi, memotong audio per kalimat |
 | `app/asr.py` · `app/translator.py` · `app/tts.py` | Whisper · TranslateGemma (llama-server / Ollama) · XTTS-v2 |
 | `app/pipeline.py` | Sesi dua arah yang berbagi satu Whisper dan satu penerjemah |

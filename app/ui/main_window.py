@@ -3,12 +3,14 @@
 import os
 import threading
 
-from PySide6.QtCore import QObject, Qt, Signal
+from PySide6.QtCore import QObject, Qt, QUrl, Signal
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFileDialog,
     QFormLayout,
+    QFrame,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -24,6 +26,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .. import gpu_check
 from ..audio_capture import list_input_devices, list_loopback_devices, list_output_devices, record_sample
 from ..config import TRANSCRIPT_DIR
 from ..languages import LANGUAGES, language_name
@@ -54,6 +57,7 @@ class _Bridge(QObject):
     result = Signal(object)
     status = Signal(str)
     recorded = Signal(str)
+    gpu = Signal(object)
 
 
 class MainWindow(QMainWindow):
@@ -67,11 +71,13 @@ class MainWindow(QMainWindow):
         self.bridge.result.connect(self._on_result)
         self.bridge.status.connect(self._on_status)
         self.bridge.recorded.connect(self._on_recorded)
+        self.bridge.gpu.connect(self._on_gpu)
         self.session = Session(cfg, self.bridge.result.emit, self.bridge.status.emit)
         self.overlay = SubtitleOverlay(cfg)
 
         self._build_ui()
         self.overlay.setVisible(cfg.listen_enabled)
+        threading.Thread(target=lambda: self.bridge.gpu.emit(gpu_check.get()), daemon=True).start()
 
     # ---------- UI ----------
     def _build_ui(self):
@@ -91,6 +97,21 @@ class MainWindow(QMainWindow):
         self.status_label = QLabel("Siap.")
         self.status_label.setWordWrap(True)
         layout.addWidget(self.status_label)
+
+        self.gpu_banner = QFrame()
+        self.gpu_banner.setStyleSheet(
+            "QFrame { background: #fff4e5; border: 1px solid #f5c27a; border-radius: 6px; } "
+            "QLabel { color: #7a4a00; border: none; }"
+        )
+        banner = QHBoxLayout(self.gpu_banner)
+        self.gpu_banner_label = QLabel()
+        self.gpu_banner_label.setWordWrap(True)
+        self.driver_btn = QPushButton("Unduh driver NVIDIA")
+        self.driver_btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(gpu_check.DRIVER_URL)))
+        banner.addWidget(self.gpu_banner_label, 1)
+        banner.addWidget(self.driver_btn)
+        self.gpu_banner.hide()
+        layout.addWidget(self.gpu_banner)
 
         self.tabs = QTabWidget()
         self.tabs.addTab(self._build_listen_tab(), "Dengar → subtitle")
@@ -274,6 +295,9 @@ class MainWindow(QMainWindow):
     def _build_engine_tab(self):
         tab = QWidget()
         form = QFormLayout(tab)
+        self.gpu_label = QLabel("Memeriksa GPU...")
+        self.gpu_label.setWordWrap(True)
+        form.addRow("GPU:", self.gpu_label)
         self.whisper_combo = QComboBox()
         self.whisper_combo.addItems(WHISPER_MODELS)
         self.whisper_combo.setCurrentText(self.cfg.whisper_model)
@@ -399,6 +423,14 @@ class MainWindow(QMainWindow):
         self.record_btn.setEnabled(True)
         self.record_btn.setText("● Rekam {} dtk".format(RECORD_SECONDS))
         self.status_label.setText(msg)
+
+    def _on_gpu(self, info):
+        self.gpu_label.setText(info.message())
+        if info.status == "ok" and not (info.vram_mb and info.vram_mb < gpu_check.MIN_VRAM_MB):
+            return
+        self.gpu_banner_label.setText("⚠ " + info.message())
+        self.driver_btn.setVisible(info.status in ("old", "missing"))
+        self.gpu_banner.show()
 
     def _on_view_changed(self, *_):
         c = self.cfg

@@ -11,6 +11,7 @@ import threading
 import time
 from dataclasses import dataclass
 
+from . import gpu_check
 from .audio_capture import TARGET_SR, AudioPlayer, InputCapture
 from .config import BUILTIN_MT_MODEL, LLAMA_SERVER, TRANSCRIPT_DIR
 from .segmenter import SpeechSegmenter
@@ -226,6 +227,9 @@ class Session:
         from .translator import LlamaServerTranslator, OllamaTranslator
 
         cfg = self.cfg
+        gpu = gpu_check.get()
+        if not gpu.has_cuda:
+            self.status(gpu.message())
         if not cfg.listen_enabled and not cfg.speak_enabled:
             raise RuntimeError("Aktifkan minimal satu: 'Dengar' atau 'Bicara'.")
         if cfg.speak_enabled:
@@ -240,11 +244,14 @@ class Session:
             self.translator = OllamaTranslator(cfg.ollama_url, cfg.ollama_model)
         else:
             self.status("Memuat TranslateGemma (llama.cpp bawaan)...")
-            self.translator = LlamaServerTranslator(LLAMA_SERVER, BUILTIN_MT_MODEL)
+            self.translator = LlamaServerTranslator(LLAMA_SERVER, BUILTIN_MT_MODEL, gpu_layers=99 if gpu.has_cuda else 0)
         self.translator.check()
 
         self.status("Memuat Whisper '{}' (pertama kali akan mengunduh model)...".format(cfg.whisper_model))
-        self.asr = Transcriber(cfg.whisper_model, cfg.whisper_device, cfg.whisper_compute_type, log=self.status)
+        if gpu.has_cuda:
+            self.asr = Transcriber(cfg.whisper_model, cfg.whisper_device, cfg.whisper_compute_type, log=self.status)
+        else:
+            self.asr = Transcriber(cfg.whisper_model, "cpu", "int8", log=self.status)
 
         self.status("Memanaskan TranslateGemma...")
         self.translator.translate("Hello", "en", "id")
@@ -254,7 +261,7 @@ class Session:
             from .tts import VoiceCloner
 
             self.status("Memuat XTTS-v2 (pertama kali mengunduh ~1,8 GB)...")
-            tts = VoiceCloner(cfg.voice_sample, cfg.tts_device, log=self.status)
+            tts = VoiceCloner(cfg.voice_sample, cfg.tts_device if gpu.has_cuda else "cpu", log=self.status)
             player = AudioPlayer(cfg.virtual_mic_device)
             voice = self._voice = _VoiceOutput(self, tts, player, cfg.speak_target_language)
             voice.start()

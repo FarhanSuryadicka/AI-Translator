@@ -17,7 +17,7 @@ $iscc = @(
 ) | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $iscc) { throw "Inno Setup 6 tidak ditemukan. Instal: winget install JRSoftware.InnoSetup" }
 
-foreach ($p in @("models\translategemma", "models\whisper", "models\tts", "vendor\llama\llama-server.exe")) {
+foreach ($p in @("models\translategemma", "models\whisper", "models\tts", "vendor\llama\llama-server.exe", "vendor\llama\vcruntime140.dll")) {
     if (-not (Test-Path (Join-Path $Root $p))) { throw "Belum ada: $p (jalankan: .venv\Scripts\python.exe packaging\download_models.py --xtts)" }
 }
 

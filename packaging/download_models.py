@@ -8,6 +8,7 @@ Coqui Public Model License (non-komersial): https://coqui.ai/cpml
 
 import io
 import os
+import shutil
 import sys
 import urllib.request
 import zipfile
@@ -24,6 +25,9 @@ LLAMA_ZIPS = [
     "llama-{0}-bin-win-cuda-12.4-x64.zip".format(LLAMA_RELEASE),
     "cudart-llama-bin-win-cuda-12.4-x64.zip",
 ]
+# Visual C++ runtime untuk llama-server.exe. Ikut dibundel (app-local) agar PC tujuan
+# tidak perlu menginstal "VC++ Redistributable".
+VC_RUNTIME = ["msvcp140.dll", "vcruntime140.dll", "vcruntime140_1.dll"]
 
 
 def translategemma():
@@ -49,13 +53,27 @@ def whisper():
 
 def llama_cpp():
     if os.path.exists(os.path.join(LLAMA_DIR, "llama-server.exe")):
-        return print("[ok] llama.cpp sudah ada")
-    os.makedirs(LLAMA_DIR, exist_ok=True)
-    for name in LLAMA_ZIPS:
-        url = "https://github.com/ggml-org/llama.cpp/releases/download/{}/{}".format(LLAMA_RELEASE, name)
-        print("[..]", url)
-        with urllib.request.urlopen(url) as r:
-            zipfile.ZipFile(io.BytesIO(r.read())).extractall(LLAMA_DIR)
+        print("[ok] llama.cpp sudah ada")
+    else:
+        os.makedirs(LLAMA_DIR, exist_ok=True)
+        for name in LLAMA_ZIPS:
+            url = "https://github.com/ggml-org/llama.cpp/releases/download/{}/{}".format(LLAMA_RELEASE, name)
+            print("[..]", url)
+            with urllib.request.urlopen(url) as r:
+                zipfile.ZipFile(io.BytesIO(r.read())).extractall(LLAMA_DIR)
+    vc_runtime()
+
+
+def vc_runtime():
+    system32 = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32")
+    for name in VC_RUNTIME:
+        dest = os.path.join(LLAMA_DIR, name)
+        if not os.path.exists(dest):
+            src = os.path.join(system32, name)
+            if not os.path.exists(src):
+                sys.exit("{} tidak ada di System32. Instal 'VC++ Redistributable x64' lalu ulangi.".format(name))
+            shutil.copy2(src, dest)
+            print("[..] salin", name, "-> vendor/llama")
 
 
 def xtts():

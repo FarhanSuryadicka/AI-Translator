@@ -140,11 +140,14 @@ def _free_port():
 class LlamaServerTranslator:
     """Menjalankan llama-server.exe (llama.cpp) sebagai proses latar belakang."""
 
-    def __init__(self, server_exe, model_path, gpu_layers=99, ctx=1024, timeout=60):
+    def __init__(self, server_exe, model_path, gpu_layers=99, ctx=1536, parallel=2, timeout=60):
         self.server_exe = server_exe
         self.model_path = model_path
         self.gpu_layers = gpu_layers
+        # 2 slot: terjemahan sementara (subtitle langsung) tidak perlu menunggu terjemahan kalimat final.
+        # Konteks dibagi rata per slot (768 token; prompt + 1 kalimat + hasil < 500 token).
         self.ctx = ctx
+        self.parallel = parallel
         self.timeout = timeout
         self._proc = None
         self.base_url = ""
@@ -164,7 +167,7 @@ class LlamaServerTranslator:
                 "--port", str(port),
                 "-ngl", str(self.gpu_layers),
                 "-c", str(self.ctx),
-                "--parallel", "1",
+                "--parallel", str(self.parallel),
                 # Hemat VRAM agar muat bersama Whisper + XTTS di GPU 6 GB.
                 "-b", "256",
                 "-ub", "256",
@@ -202,7 +205,7 @@ class LlamaServerTranslator:
             json={
                 "prompt": prompt,
                 "temperature": 0,
-                "n_predict": 512,
+                "n_predict": 320,
                 "stop": ["<end_of_turn>"],
                 "cache_prompt": True,
             },

@@ -125,6 +125,7 @@ class MainWindow(QMainWindow):
         self._t0 = None
         self._speak_off = False
         self._live = {}  # seq kalimat langsung -> baris transkrip [Beranda, Dengar]
+        self._last_tr = ""  # terjemahan terakhir yang ditampilkan di subtitle
 
         self._build()
         self.overlay.moved.connect(self.pages["subtitle"].overlay_moved)
@@ -692,8 +693,10 @@ class MainWindow(QMainWindow):
         else:
             home.feed.add(MsgItem(direction, r.original, r.translation, stamp, meta))
         if direction == "in":
-            self.overlay.set_text(r.original, r.translation)
-            self.pages["subtitle"].preview.set_text(r.original, r.translation)
+            self._last_tr = r.translation
+            if not self._live:  # kalimat berikutnya belum mulai -> tampilkan versi final
+                self.overlay.set_text(r.original, r.translation)
+                self.pages["subtitle"].preview.set_text(r.original, r.translation)
         else:
             self.pages["speak"].set_timings(r.asr_ms, r.mt_ms)
             self.pages["speak"].animate()
@@ -718,8 +721,12 @@ class MainWindow(QMainWindow):
             for feed in (self.pages["home"].feed, self.pages["listen"].feed):
                 feed.scroll_to_end()
         if r.partial:
-            self.overlay.set_text(r.original, r.translation or "…")
-            self.pages["subtitle"].preview.set_text(r.original, r.translation or "…")
+            if r.translation:
+                self._last_tr = r.translation
+            # Terjemahan kalimat baru belum ada: tetap tampilkan terjemahan terakhir, jangan hanya "…".
+            shown = r.translation or self._last_tr or "…"
+            self.overlay.set_text(r.original, shown)
+            self.pages["subtitle"].preview.set_text(r.original, shown)
 
     # ================================================================ tutup
     def closeEvent(self, event):

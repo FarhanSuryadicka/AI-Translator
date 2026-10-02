@@ -56,15 +56,15 @@ def _norm(text):
     return "".join(ch for ch in text.lower() if ch.isalnum())
 
 
-class _Translator(threading.Thread):
-    """Terjemahan di latar belakang.
+class _Translator:
+    """Terjemahan di latar belakang, dua pekerja yang jalan bersamaan (llama-server punya 2 slot):
 
-    - final  : antrean berurutan, semua dikerjakan (masuk transkrip)
-    - partial: hanya permintaan terbaru (teks sementara cepat basi)
+    - sementara: hanya permintaan terbaru (teks sementara cepat basi) -> subtitle langsung
+    - final    : antrean berurutan, semua dikerjakan: baca ulang model utama + terjemah -> transkrip
+    Terpisah supaya terjemahan sementara tidak menunggu kalimat final (dulu subtitle sering hanya "…").
     """
 
     def __init__(self, session, source_lang, target_lang, on_partial, on_final):
-        super().__init__(daemon=True)
         self.session = session
         self.source_lang = source_lang
         self.target = target_lang
@@ -72,17 +72,24 @@ class _Translator(threading.Thread):
         self._cond = threading.Condition()
         self._finals = collections.deque()
         self._partial = None
+        # Teks yang sudah diterjemahkan: kalimat final yang sama tidak perlu diterjemahkan ulang.
+        self._cache = collections.OrderedDict()
+        self._cache_lock = threading.Lock()
+
+    def start(self):
+        for target in (self._run_partial, self._run_final):
+            threading.Thread(target=target, daemon=True).start()
 
     def partial(self, seq, text, src):
         with self._cond:
             self._partial = (seq, text, src)
-            self._cond.notify()
+            self._cond.notify_all()
 
     def final(self, seq, audio, fallback_text, src):
         """Kalimat selesai: dibaca ulang dengan model utama (lebih akurat), lalu diterjemahkan."""
         with self._cond:
             self._finals.append((seq, audio, fallback_text, src))
-            self._cond.notify()
+            self._cond.notify_all()
 
     def _final_asr(self, audio, fallback_text, src):
         s = self.session
@@ -97,33 +104,52 @@ class _Translator(threading.Thread):
     def _translate(self, text, src):
         if src == self.target:
             return text
-        return self.session.translator.translate(text, src, self.target)
+        key = (_norm(text), src)
+        with self._cache_lock:
+            if key in self._cache:
+                return self._cache[key]
+        tr = self.session.translator.translate(text, src, self.target)
+        with self._cache_lock:
+            self._cache[key] = tr
+            while len(self._cache) > 50:
+                self._cache.popitem(last=False)
+        return tr
 
-    def run(self):
-        stop = self.session.stop_event
-        while not stop.is_set():
-            with self._cond:
-                if not self._finals and self._partial is None:
+    def _take(self, kind):
+        with self._cond:
+            if kind == "final":
+                if not self._finals:
                     self._cond.wait(0.2)
-                if self._finals:
-                    kind, data = "final", self._finals.popleft()
-                else:
-                    kind, data, self._partial = "partial", self._partial, None
-            if data is None:
+                return self._finals.popleft() if self._finals else None
+            if self._partial is None:
+                self._cond.wait(0.2)
+            job, self._partial = self._partial, None
+            return job
+
+    def _run_partial(self):
+        while not self.session.stop_event.is_set():
+            job = self._take("partial")
+            if job is None:
                 continue
+            seq, text, src = job
             try:
-                if kind == "final":
-                    seq, audio, fallback, src = data
-                    text, src, asr_ms = self._final_asr(audio, fallback, src)
-                    t0 = time.perf_counter()
-                    tr = self._translate(text, src)
-                    self.on_final(seq, text, tr, src, asr_ms, int((time.perf_counter() - t0) * 1000))
-                else:
-                    seq, text, src = data
-                    self.on_partial(seq, text, self._translate(text, src))
+                self.on_partial(seq, text, self._translate(text, src))
+            except Exception:
+                pass  # teks sementara: lewati saja, final tetap menyusul
+
+    def _run_final(self):
+        while not self.session.stop_event.is_set():
+            job = self._take("final")
+            if job is None:
+                continue
+            seq, audio, fallback, src = job
+            try:
+                text, src, asr_ms = self._final_asr(audio, fallback, src)
+                t0 = time.perf_counter()
+                tr = self._translate(text, src)
+                self.on_final(seq, text, tr, src, asr_ms, int((time.perf_counter() - t0) * 1000))
             except Exception as e:
-                if kind == "final":
-                    self.session.status("Gagal menerjemahkan: {}".format(e))
+                self.session.status("Gagal menerjemahkan: {}".format(e))
 
 
 class LiveDirection:

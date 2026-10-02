@@ -135,9 +135,9 @@ def is_installed():
 
 
 def is_configured():
-    eps = cable_endpoints()
-    names = {ep.name for ep in eps if ep.state == DEVICE_STATE_ACTIVE}
-    return MIC_NAME in names and SPEAKER_NAME in names and ORIG_16CH not in names
+    # "CABLE In 16ch" yang masih aktif hanya kosmetik (tidak dipakai), jadi tidak ikut syarat.
+    names = {ep.name for ep in cable_endpoints() if ep.state == DEVICE_STATE_ACTIVE}
+    return MIC_NAME in names and SPEAKER_NAME in names
 
 
 def speaker_name():

@@ -47,6 +47,22 @@ GUIDES = {
 }
 
 
+REMOTE_APPS = {"anydesk.exe": "AnyDesk", "rustdesk.exe": "RustDesk", "teamviewer.exe": "TeamViewer",
+               "parsecd.exe": "Parsec", "remoting_host.exe": "Chrome Remote Desktop"}
+
+
+def remote_desktop_apps():
+    """Nama aplikasi remote desktop yang sedang berjalan di sesi pengguna ini."""
+    import psutil
+
+    found = []
+    for p in psutil.process_iter(["name"]):
+        name = REMOTE_APPS.get((p.info["name"] or "").lower())
+        if name and name not in found:
+            found.append(name)
+    return found
+
+
 def short_device(name):
     """'Headset Microphone (Realtek Audio)' -> 'Headset Microphone'."""
     return name.split(" (")[0] if name else name
@@ -302,7 +318,14 @@ class ListenPage(Page):
         self.pause.valueChanged.connect(self._pause_changed)
         self._pause_changed(self.pause.value())
         vad.add(vbox(self.pause_label, self.pause, spacing=6))
-        vad.add(label("Lebih pendek = subtitle lebih cepat muncul, tapi kalimat bisa terpotong.", "small", wrap=True))
+        vad.add(label("Lebih pendek = kalimat lebih cepat final, tapi bisa terpotong.", "small", wrap=True))
+        live = Switch(self.cfg.live_captions)
+        win.binder.switch("live_captions", live)
+        live_rows = SettingRows()
+        live_rows.add("Subtitle langsung (per kata)",
+                      "Teks muncul selagi orang bicara, ±1 detik, seperti caption Google Meet. Butuh GPU NVIDIA.", live)
+        vad.add(separator())
+        vad.add(live_rows)
         self.lay.addLayout(grid2(lang, vad))
 
         inc = Card()
@@ -793,9 +816,11 @@ class SubtitlePage(Page):
         show_o = Switch(cfg.show_original)
         show_o.toggled.connect(lambda v: self._set("show_original", v))
         rows.add("Tampilkan teks asli", "Di atas terjemahan, lebih kecil.", show_o)
-        cap = Switch(cfg.hide_from_capture)
-        cap.toggled.connect(lambda v: self._set("hide_from_capture", v))
-        rows.add("Sembunyikan saat share screen", "Peserta lain tidak melihat subtitle Anda.", cap)
+        self.cap = Switch(cfg.hide_from_capture)
+        self.cap.toggled.connect(self._capture)
+        rows.add("Sembunyikan saat share screen",
+                 "Peserta lain tidak melihat subtitle Anda. Subtitle juga tidak terlihat di screenshot dan "
+                 "remote desktop (AnyDesk, RustDesk, TeamViewer).", self.cap)
         hide = QComboBox()
         hide.setFixedWidth(120)
         for secs, text in ((8, "8 detik"), (4, "4 detik"), (0, "Tidak")):
@@ -805,10 +830,30 @@ class SubtitlePage(Page):
         rows.add("Hilang otomatis", "Subtitle memudar setelah diam.", hide)
         look.add(rows)
         look.body.addStretch(1)
+        self.remote = Banner("Memakai remote desktop?", "", "Tampilkan di remote desktop")
+        self.remote.button.clicked.connect(lambda: self.cap.setChecked(False))
+        self.remote.hide()
+        self.lay.addWidget(self.remote)
         self.lay.addLayout(grid2(prev, look, ratios=[115, 100]))
         self.lay.addStretch(1)
         self._font(fs.value())
         self._opacity(op.value())
+
+    def on_show(self):
+        self._check_remote()
+
+    def _check_remote(self):
+        apps = remote_desktop_apps() if self.cfg.hide_from_capture else []
+        if apps:
+            self.remote.set("Memakai remote desktop?",
+                            "{} sedang berjalan. Selama \"Sembunyikan saat share screen\" aktif, subtitle tidak "
+                            "terlihat dari layar remote (hanya di monitor PC ini).".format(" & ".join(apps)),
+                            "Tampilkan di remote desktop")
+        self.remote.setVisible(bool(apps))
+
+    def _capture(self, v):
+        self._set("hide_from_capture", v)
+        self._check_remote()
 
     def _apply(self):
         self.preview.update()

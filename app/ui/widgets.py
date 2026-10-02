@@ -954,20 +954,28 @@ class MsgItem(QFrame):
         lay.addWidget(Avatar(direction), 0, Qt.AlignTop)
         col = QVBoxLayout()
         col.setSpacing(1)
-        o = label(original, "msgO", wrap=True)
-        t = label(translation, "msgT", wrap=True)
-        for w in (o, t):
+        self.o = label(original, "msgO", wrap=True)
+        self.t = label(translation, "msgT", wrap=True)
+        for w in (self.o, self.t):
             w.setTextInteractionFlags(Qt.TextSelectableByMouse)
             w.setTextFormat(Qt.PlainText)
-        col.addWidget(o)
-        col.addWidget(t)
-        if meta:
-            m = label(meta, "msgMeta", rich=True)
-            col.addSpacing(2)
-            col.addWidget(m)
+        col.addWidget(self.o)
+        col.addWidget(self.t)
+        self.meta = label(meta, "msgMeta", rich=True)
+        self.meta.setVisible(bool(meta))
+        col.addSpacing(2)
+        col.addWidget(self.meta)
         lay.addLayout(col, 1)
-        if time_text:
-            lay.addWidget(label(time_text, "msgTime"), 0, Qt.AlignTop)
+        self.time = label(time_text, "msgTime")
+        lay.addWidget(self.time, 0, Qt.AlignTop)
+
+    def update_text(self, original, translation, meta=None):
+        """Perbarui baris yang sama (subtitle langsung: teks sementara -> final)."""
+        self.o.setText(original)
+        self.t.setText(translation or "…")
+        if meta is not None:
+            self.meta.setText(meta)
+            self.meta.setVisible(bool(meta))
 
 
 class Feed(QScrollArea):
@@ -1014,6 +1022,9 @@ class Feed(QScrollArea):
         item.setVisible(self.filter in ("all", item.direction))
         if scroll:
             QTimer.singleShot(30, lambda: self.verticalScrollBar().setValue(self.verticalScrollBar().maximum()))
+
+    def scroll_to_end(self):
+        QTimer.singleShot(30, lambda: self.verticalScrollBar().setValue(self.verticalScrollBar().maximum()))
 
     def set_filter(self, f):
         self.filter = f

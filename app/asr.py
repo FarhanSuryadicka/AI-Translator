@@ -72,13 +72,31 @@ class Transcriber:
         segments, _ = self.model.transcribe(np.zeros(16000, dtype=np.float32), language="en")
         list(segments)
 
-    def transcribe(self, audio, language=None):
-        """Kembalikan (teks, kode_bahasa)."""
+    def transcribe_segments(self, audio, language=None):
+        """Untuk subtitle langsung: [(mulai_dtk, akhir_dtk, teks)], kode_bahasa. Audio sudah dipotong VAD."""
         segments, info = self.model.transcribe(
             audio,
             language=language,
             beam_size=1,
-            vad_filter=True,
+            vad_filter=False,
+            condition_on_previous_text=False,
+        )
+        out = []
+        for s in segments:
+            if s.no_speech_prob > 0.6 and s.avg_logprob < -1.0:
+                continue
+            text = s.text.strip()
+            if text and text.lower() not in HALLUCINATIONS:
+                out.append((s.start, s.end, text))
+        return out, info.language
+
+    def transcribe(self, audio, language=None, vad=True):
+        """Kembalikan (teks, kode_bahasa). vad=False bila audio sudah dipotong oleh VAD sendiri (mode langsung)."""
+        segments, info = self.model.transcribe(
+            audio,
+            language=language,
+            beam_size=1,
+            vad_filter=vad,
             condition_on_previous_text=False,
             without_timestamps=True,
         )

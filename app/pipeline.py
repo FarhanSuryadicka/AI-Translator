@@ -36,6 +36,8 @@ class Result:
     language: str
     asr_ms: int
     mt_ms: int
+    partial: bool = False  # teks sementara (subtitle langsung); versi final menyusul dengan seq yang sama
+    seq: int = 0
 
 
 class _Direction:
@@ -206,6 +208,8 @@ class Session:
         self._error = None
         self._transcript = None
         self.translator = None
+        self.asr_fast = None
+        self.asr_fast_lock = threading.Lock()
         self._transcript_lock = threading.Lock()
 
     # ---------- API untuk UI ----------
@@ -239,7 +243,7 @@ class Session:
 
     def emit(self, result):
         self._on_result(result)
-        if self._transcript is not None:
+        if self._transcript is not None and not result.partial:
             stamp = datetime.datetime.now().strftime("%H:%M:%S")
             tag = "DENGAR" if result.direction == LISTEN else "BICARA"
             with self._transcript_lock:
@@ -306,6 +310,15 @@ class Session:
         else:
             self.asr = Transcriber(cfg.whisper_model, "cpu", "int8", log=self.status)
 
+        self.asr_fast = None
+        if cfg.listen_enabled and cfg.live_captions and gpu.has_cuda and cfg.whisper_model not in ("tiny", "base"):
+            # Model kecil khusus teks sementara (dibaca ulang tiap 0,4 dtk); teks final tetap dari model utama.
+            self.status("Memuat Whisper base untuk subtitle langsung...")
+            try:
+                self.asr_fast = Transcriber("base", cfg.whisper_device, cfg.whisper_compute_type, log=self.status)
+            except Exception as e:
+                self.status("Whisper base gagal dimuat ({}), subtitle langsung memakai model utama.".format(e))
+
         self.status("Memanaskan TranslateGemma...")
         self.translator.translate("Hello", "en", "id")
 
@@ -326,7 +339,14 @@ class Session:
             self._transcript = open(os.path.join(TRANSCRIPT_DIR, name), "a", encoding="utf-8")
 
         directions = self._directions
-        if cfg.listen_enabled:
+        if cfg.listen_enabled and cfg.live_captions and gpu.has_cuda:
+            from .streaming import LiveDirection
+
+            directions.append(
+                LiveDirection(self, LISTEN, lambda cb: _listen_capture(cb, cfg), cfg.source_language,
+                              cfg.target_language, cfg.listen_pause_ms)
+            )
+        elif cfg.listen_enabled:
             directions.append(
                 _Direction(
                     self,

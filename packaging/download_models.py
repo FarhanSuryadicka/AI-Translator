@@ -54,6 +54,17 @@ def whisper():
     snapshot_download(WHISPER_REPO, local_dir=dest)
 
 
+def whisper_base():
+    """Model cepat untuk subtitle langsung (teks sementara per kata)."""
+    from huggingface_hub import snapshot_download
+
+    dest = os.path.join(MODELS, "whisper", "faster-whisper-base")
+    if os.path.exists(os.path.join(dest, "model.bin")):
+        return print("[ok] Whisper base sudah ada")
+    print("[..] Whisper base (~140 MB)")
+    snapshot_download("Systran/faster-whisper-base", local_dir=dest)
+
+
 def llama_cpp():
     if os.path.exists(os.path.join(LLAMA_DIR, "llama-server.exe")):
         print("[ok] llama.cpp sudah ada")
@@ -100,6 +111,7 @@ def xtts():
 def main():
     translategemma()
     whisper()
+    whisper_base()
     llama_cpp()
     vbcable()
     if "--xtts" in sys.argv:

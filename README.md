@@ -10,6 +10,8 @@ BICARA : mic Anda → Whisper → TranslateGemma 4B → XTTS-v2 (suara tiruan An
 
 ## Fitur
 
+- **Subtitle langsung per kata**: seperti caption Google Meet. Kata yang diucapkan muncul ±0,7 detik kemudian,
+  terjemahannya menyusul ±1 detik setelahnya, lalu dirapikan saat kalimat selesai. Tetap jalan walau ada musik latar (Silero VAD).
 - **Subtitle terjemahan melayang**: selalu di atas aplikasi lain, bisa digeser dan diubah ukurannya,
   dan tidak ikut terlihat saat share screen.
 - **Tangkap per-aplikasi**: terjemahkan hanya suara Zoom atau Chrome, sementara notifikasi dan musik diabaikan.
@@ -63,7 +65,8 @@ Diukur dengan satu kalimat berdurasi 5,7 detik, di RTX 3050 6 GB dibandingkan de
 |---|---|---|
 | Whisper small (ucapan → teks) | 0,3 dtk | 1,6 dtk |
 | TranslateGemma 4B Q4_K_M | 0,3–0,9 dtk | 1,1–3,3 dtk |
-| **Dengar: sampai subtitle muncul** | **~1,2 dtk** | **~5 dtk** |
+| **Dengar: sampai subtitle muncul** | **~1,2 dtk** setelah kalimat selesai | **~5 dtk** |
+| **Dengar, subtitle langsung**: kata asli / terjemahan | **~0,7 dtk / ~1,5 dtk** setelah diucapkan | tidak tersedia |
 | XTTS-v2: membuat 4 dtk suara | 2,6 dtk (real-time) | 12 dtk (patah-patah) |
 
 VRAM total dengan semua fitur aktif (termasuk Windows) sekitar 5,9 GB.
@@ -93,6 +96,7 @@ Model dan llama.cpp **tidak disimpan di git** karena ukurannya beberapa GB.
 |---|---|---|
 | `models/translategemma/` | `translategemma-4b-it.Q4_K_M.gguf` | [mradermacher/translategemma-4b-it-GGUF](https://huggingface.co/mradermacher/translategemma-4b-it-GGUF) |
 | `models/whisper/faster-whisper-small/` | Whisper small (CTranslate2) | [Systran/faster-whisper-small](https://huggingface.co/Systran/faster-whisper-small) |
+| `models/whisper/faster-whisper-base/` | Whisper base, untuk teks sementara subtitle langsung | [Systran/faster-whisper-base](https://huggingface.co/Systran/faster-whisper-base) |
 | `models/tts/` | XTTS-v2 (opsi `--xtts`, lisensi CPML) | Coqui |
 | `vendor/vbcable/` | Paket resmi VB-CABLE Driver Pack 45 | [vb-audio.com/Cable](https://vb-audio.com/Cable/) |
 | `vendor/llama/` | llama.cpp `b11344` win-cuda-12.4-x64 + cudart | [ggml-org/llama.cpp releases](https://github.com/ggml-org/llama.cpp/releases/tag/b11344) |
@@ -107,6 +111,7 @@ Model dan llama.cpp **tidak disimpan di git** karena ukurannya beberapa GB.
 | `app/process_loopback.py` | Tangkap audio satu aplikasi (WASAPI process loopback, ctypes) |
 | `app/audio_setup.py` | Merapikan VB-CABLE: ganti nama mic/speaker, nonaktifkan CABLE In 16ch (`--setup-audio`) |
 | `app/gpu_check.py` | Deteksi GPU NVIDIA, versi driver, dan VRAM |
+| `app/streaming.py` | Subtitle langsung: Silero VAD + Whisper base tiap 0,4 dtk (teks sementara), LocalAgreement untuk memfinalkan kalimat, Whisper small + TranslateGemma untuk teks final |
 | `app/segmenter.py` | VAD berbasis energi, memotong audio per kalimat |
 | `app/asr.py` · `app/translator.py` · `app/tts.py` | Whisper · TranslateGemma (llama-server / Ollama) · XTTS-v2 |
 | `app/pipeline.py` | Sesi dua arah yang berbagi satu Whisper dan satu penerjemah |

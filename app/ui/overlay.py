@@ -69,9 +69,25 @@ class SubtitleOverlay(QWidget):
         self.original.setVisible(self.cfg.show_original)
         self.update()
 
+    @staticmethod
+    def _tail(label, text, lines):
+        """Seperti caption Meet: tampilkan hanya `lines` baris terakhir dari kalimat yang panjang."""
+        width = max(label.width(), 200)
+        fm = label.fontMetrics()
+        if fm.boundingRect(0, 0, width, 10000, Qt.TextWordWrap, text).height() <= fm.lineSpacing() * lines + 2:
+            return text
+        words = text.split()
+        out = []
+        for word in reversed(words):
+            trial = " ".join([word] + out)
+            if fm.boundingRect(0, 0, width, 10000, Qt.TextWordWrap, "… " + trial).height() > fm.lineSpacing() * lines + 2:
+                break
+            out.insert(0, word)
+        return "… " + " ".join(out) if out else text[-80:]
+
     def set_text(self, original, translation):
-        self.original.setText(original)
-        self.translation.setText(translation)
+        self.original.setText(self._tail(self.original, original, 1))
+        self.translation.setText(self._tail(self.translation, translation, 2))
         if not self.cfg.overlay_enabled:
             return
         self._fade.stop()

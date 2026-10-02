@@ -45,6 +45,8 @@ class Config:
     loopback_app: str = ""
     # Jeda hening (ms) yang dianggap akhir kalimat. Lebih pendek = subtitle lebih cepat, tapi bisa terpotong.
     listen_pause_ms: int = 650
+    # Subtitle langsung per kata (seperti live caption Meet). Butuh GPU; di CPU otomatis pakai mode per kalimat.
+    live_captions: bool = True
 
     # Arah "Bicara": mic Anda -> terjemahan -> suara tiruan Anda -> virtual mic (VB-Audio Cable)
     speak_enabled: bool = False

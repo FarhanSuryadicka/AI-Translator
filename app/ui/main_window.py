@@ -124,6 +124,7 @@ class MainWindow(QMainWindow):
         self._lat = 0
         self._t0 = None
         self._speak_off = False
+        self._live = {}  # seq kalimat langsung -> baris transkrip [Beranda, Dengar]
 
         self._build()
         self.overlay.moved.connect(self.pages["subtitle"].overlay_moved)
@@ -563,6 +564,7 @@ class MainWindow(QMainWindow):
         home.st_time.setText("00:00")
         home.feed.clear()
         self.pages["listen"].feed.clear()
+        self._live = {}
         self._set_state("loading")
         self.sess_txt.setText("Memuat model…")
         # Bicara dimatikan sementara: Session membaca cfg saat _setup() di thread-nya sendiri.
@@ -671,14 +673,25 @@ class MainWindow(QMainWindow):
 
     def _on_result(self, r):
         direction = "in" if r.direction == LISTEN else "out"
+        if direction == "in" and (r.partial or r.seq in self._live):
+            self._on_live(r)
+            if r.partial:
+                return
         meta = ("<span style='color:{m}; font-weight:600'>{lang}</span>&nbsp;&nbsp;"
                 "<span style='color:{f}'>suara→teks {a} ms · terjemah {b} ms</span>").format(
             m=Palette.c["muted"], f=Palette.c["faint"], lang=r.language.upper(), a=r.asr_ms, b=r.mt_ms)
         stamp = time.strftime("%H:%M:%S")
         home = self.pages["home"]
-        home.feed.add(MsgItem(direction, r.original, r.translation, stamp, meta))
-        if direction == "in":
+        if direction == "in" and r.seq in self._live:
+            # Kalimat langsung selesai: baris sementara menjadi final.
+            for item in self._live.pop(r.seq):
+                item.update_text(r.original, r.translation, meta)
+        elif direction == "in":
+            home.feed.add(MsgItem(direction, r.original, r.translation, stamp, meta))
             self.pages["listen"].feed.add(MsgItem(direction, r.original, r.translation, stamp, meta))
+        else:
+            home.feed.add(MsgItem(direction, r.original, r.translation, stamp, meta))
+        if direction == "in":
             self.overlay.set_text(r.original, r.translation)
             self.pages["subtitle"].preview.set_text(r.original, r.translation)
         else:
@@ -688,6 +701,25 @@ class MainWindow(QMainWindow):
         self._lat += r.asr_ms + r.mt_ms
         home.st_count.setText(str(self._count))
         home.st_lat.setText("{} dtk".format("{:.1f}".format(self._lat / self._count / 1000).replace(".", ",")))
+
+    def _on_live(self, r):
+        """Teks sementara: perbarui baris transkrip yang sama + subtitle, tanpa menambah statistik."""
+        items = self._live.get(r.seq)
+        if items is None:
+            stamp = time.strftime("%H:%M:%S")
+            live_meta = "<span style='color:{}; font-weight:600'>● LANGSUNG</span>".format(Palette.c["ok"])
+            items = [MsgItem("in", r.original, r.translation or "…", stamp, live_meta) for _ in range(2)]
+            self.pages["home"].feed.add(items[0])
+            self.pages["listen"].feed.add(items[1])
+            self._live[r.seq] = items
+        elif r.partial:
+            for item in items:
+                item.update_text(r.original, r.translation)
+            for feed in (self.pages["home"].feed, self.pages["listen"].feed):
+                feed.scroll_to_end()
+        if r.partial:
+            self.overlay.set_text(r.original, r.translation or "…")
+            self.pages["subtitle"].preview.set_text(r.original, r.translation or "…")
 
     # ================================================================ tutup
     def closeEvent(self, event):

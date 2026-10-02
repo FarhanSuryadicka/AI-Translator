@@ -55,6 +55,7 @@ datas += [(os.path.join(ROOT, "app", "assets"), os.path.join("app", "assets"))]
 ICON = os.path.join(ROOT, "app", "assets", "icon.ico")
 
 hiddenimports += [
+    "PySide6.QtSvg",  # ikon UI digambar dari SVG
     "transformers.models.gpt2",
     "transformers.generation",
 ]

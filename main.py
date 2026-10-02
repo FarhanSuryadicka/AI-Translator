@@ -88,8 +88,8 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName("AI Translator")
     app.setWindowIcon(QIcon(ICON_PATH))
-    window = MainWindow(Config.load())
-    window.show()
+    app.setQuitOnLastWindowClosed(False)  # tetap hidup di system tray saat dibuka dengan --tray
+    window = MainWindow(Config.load(), start_in_tray="--tray" in sys.argv)  # noqa: F841
     sys.exit(app.exec())
 
 

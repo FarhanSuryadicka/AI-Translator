@@ -11,6 +11,8 @@ import threading
 import time
 from dataclasses import dataclass
 
+import numpy as np
+
 from . import gpu_check
 from .audio_capture import TARGET_SR, AudioPlayer, InputCapture, list_output_devices
 from .config import BUILTIN_MT_MODEL, LLAMA_SERVER, TRANSCRIPT_DIR
@@ -21,6 +23,9 @@ SPEAK = "speak"
 
 # Kalau loopback tidak mengirim audio selama ini, kalimat yang sedang berjalan dianggap selesai.
 STALE_FLUSH_SEC = 0.8
+# Laporan level audio ke UI (level meter) paling sering sekali per interval ini.
+LEVEL_INTERVAL_SEC = 0.1
+MONITOR_GAIN = 0.35
 
 
 @dataclass
@@ -63,6 +68,7 @@ class _Direction:
     def _loop(self):
         stop = self.session.stop_event
         last_audio = time.monotonic()
+        last_level, peak = 0.0, 0.0
         while not stop.is_set():
             try:
                 chunk = self.queue.get(timeout=0.2)
@@ -71,8 +77,14 @@ class _Direction:
                     seg = self.segmenter.flush()
                     if seg is not None:
                         self._process(seg)
+                self.session.level(self.name, -90.0)
                 continue
             last_audio = time.monotonic()
+            if len(chunk):
+                peak = max(peak, float(np.sqrt(np.mean(chunk * chunk))))
+            if last_audio - last_level >= LEVEL_INTERVAL_SEC:
+                self.session.level(self.name, 20 * np.log10(peak + 1e-9))
+                last_level, peak = last_audio, 0.0
             for seg in self.segmenter.push(chunk):
                 self._process(seg)
 
@@ -103,16 +115,35 @@ class _Direction:
 class _VoiceOutput:
     """Antrian kalimat -> XTTS (streaming) -> virtual mic. Jalan di thread sendiri agar mic tetap didengar."""
 
-    def __init__(self, session, tts, player, language):
+    def __init__(self, session, tts, player, language, monitor=None):
         self.session = session
         self.tts = tts
         self.player = player
         self.language = language
+        # Pemantauan ke headset diputar di thread terpisah agar tidak menunda virtual mic.
+        self.monitor = monitor
+        self._monitor_queue = queue.Queue()
         self.queue = queue.Queue()
         self.thread = threading.Thread(target=self._run, daemon=True)
 
     def start(self):
         self.thread.start()
+        if self.monitor is not None:
+            threading.Thread(target=self._run_monitor, daemon=True).start()
+
+    def _run_monitor(self):
+        from .tts import SAMPLE_RATE
+
+        stop = self.session.stop_event
+        while not stop.is_set():
+            try:
+                chunk = self._monitor_queue.get(timeout=0.2)
+            except queue.Empty:
+                continue
+            try:
+                self.monitor.play(chunk * MONITOR_GAIN, SAMPLE_RATE)
+            except Exception:
+                pass
 
     def say(self, text):
         self.queue.put(text)
@@ -130,12 +161,16 @@ class _VoiceOutput:
                 for chunk in self.tts.stream(text, self.language):
                     if stop.is_set():
                         break
+                    if self.monitor is not None:
+                        self._monitor_queue.put(chunk)
                     self.player.play(chunk, SAMPLE_RATE)
             except Exception as e:
                 self.session.status("Gagal membuat suara: {}".format(e))
 
     def close(self):
         self.player.close()
+        if self.monitor is not None:
+            self.monitor.close()
 
 
 def _virtual_mic(cfg):
@@ -160,10 +195,11 @@ def _listen_capture(on_audio, cfg):
 
 
 class Session:
-    def __init__(self, cfg, on_result, on_status):
+    def __init__(self, cfg, on_result, on_status, on_level=None):
         self.cfg = cfg
         self._on_result = on_result
         self._on_status = on_status
+        self._on_level = on_level
         self.stop_event = threading.Event()
         self.asr_lock = threading.Lock()
         self._thread = None
@@ -192,6 +228,10 @@ class Session:
     # ---------- dipanggil dari thread pekerja ----------
     def status(self, msg):
         self._on_status(msg)
+
+    def level(self, direction, db):
+        if self._on_level is not None:
+            self._on_level(direction, db)
 
     def fail(self, msg):
         self._error = msg
@@ -276,7 +316,8 @@ class Session:
             self.status("Memuat XTTS-v2 (pertama kali mengunduh ~1,8 GB)...")
             tts = VoiceCloner(cfg.voice_sample, cfg.tts_device if gpu.has_cuda else "cpu", log=self.status)
             player = AudioPlayer(_virtual_mic(cfg))
-            voice = self._voice = _VoiceOutput(self, tts, player, cfg.speak_target_language)
+            monitor = AudioPlayer("") if cfg.speak_monitor else None
+            voice = self._voice = _VoiceOutput(self, tts, player, cfg.speak_target_language, monitor)
             voice.start()
 
         if cfg.save_transcript:
@@ -291,7 +332,7 @@ class Session:
                     self,
                     LISTEN,
                     lambda cb: _listen_capture(cb, cfg),
-                    SpeechSegmenter(sr=TARGET_SR),
+                    SpeechSegmenter(sr=TARGET_SR, silence_ms=cfg.listen_pause_ms),
                     cfg.source_language,
                     cfg.target_language,
                 )
@@ -310,6 +351,7 @@ class Session:
             )
         for d in directions:
             d.start()
+        self._on_status("RUNNING")
 
         parts = []
         for d in directions:

@@ -39,6 +39,10 @@ BICARA : mic Anda → Whisper → TranslateGemma 4B → XTTS-v2 (suara tiruan An
 
 ## Cara pakai
 
+Jendela utama punya menu **Beranda** (kedua arah, transkrip langsung, kesiapan sistem), **Dengar**, **Bicara**,
+**Subtitle**, **Riwayat** (cari, salin, ekspor .srt), **Pengaturan** (GPU/VRAM, model Whisper, mesin terjemahan, tema),
+dan **Tentang**. Saat pertama kali dibuka, muncul **Panduan awal** (cek sistem, rekam suara, lisensi).
+
 **Dengar (terjemahkan orang lain)**
 1. Pilih **Tangkap dari**: *Semua suara*, atau *Hanya aplikasi: Zoom.exe / chrome.exe / ...*.
    Aplikasinya harus sudah terbuka. Klik ↻ untuk memuat ulang daftar.
@@ -106,7 +110,8 @@ Model dan llama.cpp **tidak disimpan di git** karena ukurannya beberapa GB.
 | `app/segmenter.py` | VAD berbasis energi, memotong audio per kalimat |
 | `app/asr.py` · `app/translator.py` · `app/tts.py` | Whisper · TranslateGemma (llama-server / Ollama) · XTTS-v2 |
 | `app/pipeline.py` | Sesi dua arah yang berbagi satu Whisper dan satu penerjemah |
-| `app/ui/` | Jendela utama (PySide6) dan overlay subtitle |
+| `app/ui/` | `main_window.py` (kerangka, sesi), `pages.py` (7 halaman), `widgets.py` (komponen kustom), `theme.py` (warna/QSS terang-gelap, font Inter), `wizard.py` (panduan awal), `overlay.py` (subtitle) |
+| `app/history.py` · `app/autostart.py` | Membaca transkrip untuk Riwayat + ekspor .srt · mulai bersama Windows (`--tray`) |
 | `packaging/` | Spec PyInstaller, script Inno Setup, build, ikon, unduh model |
 | `mockup/` | Mockup HTML untuk desain UI berikutnya |
 

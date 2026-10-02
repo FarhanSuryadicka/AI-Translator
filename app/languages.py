@@ -65,3 +65,26 @@ LANGUAGES = {
 
 def language_name(code):
     return LANGUAGES.get(code, code)
+
+
+# Label untuk UI: nama asli bahasa (seperti di mockup); selain ini memakai nama Inggris.
+_LABELS = {
+    "id": "Bahasa Indonesia", "en": "English", "ja": "日本語", "zh": "中文", "ko": "한국어",
+    "ar": "العربية", "hi": "हिन्दी", "th": "ไทย", "vi": "Tiếng Việt", "ms": "Bahasa Melayu",
+    "jw": "Basa Jawa", "su": "Basa Sunda", "fr": "Français", "de": "Deutsch", "es": "Español",
+    "pt": "Português", "it": "Italiano", "nl": "Nederlands", "ru": "Русский", "tr": "Türkçe",
+    "pl": "Polski",
+}
+# Urutan di atas daftar (paling sering dipakai), sisanya abjad.
+POPULAR = ["id", "en", "ja", "zh", "ko", "ar", "ms", "th", "vi", "es", "fr", "de"]
+
+
+def language_label(code):
+    return _LABELS.get(code, LANGUAGES.get(code, code))
+
+
+def sorted_codes(codes):
+    codes = list(codes)
+    top = [c for c in POPULAR if c in codes]
+    rest = sorted((c for c in codes if c not in top), key=language_label)
+    return top + rest

@@ -201,18 +201,29 @@ def _windowed_pids():
 
 def list_audio_apps():
     """Nama .exe aplikasi yang punya jendela (kandidat sumber suara), urut abjad."""
+    return [name for name, _ in list_audio_apps_with_paths()]
+
+
+def list_audio_apps_with_paths():
+    """[(nama .exe, path lengkap .exe)] untuk aplikasi yang punya jendela, urut abjad (path dipakai untuk ikon)."""
     import psutil
 
-    names = set()
+    apps = {}
     me = os.getpid()
     for pid in _windowed_pids():
         if pid in (0, me):
             continue
         try:
-            names.add(psutil.Process(pid).name())
+            proc = psutil.Process(pid)
+            name = proc.name()
+            if name.lower() not in _SYSTEM_APPS and name not in apps:
+                try:
+                    apps[name] = proc.exe()
+                except (psutil.Error, OSError):
+                    apps[name] = ""
         except (psutil.Error, OSError):
             pass
-    return sorted((n for n in names if n.lower() not in _SYSTEM_APPS), key=str.lower)
+    return sorted(apps.items(), key=lambda kv: kv[0].lower())
 
 
 def find_app_pid(exe_name):

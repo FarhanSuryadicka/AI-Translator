@@ -1,54 +1,36 @@
-"""Jendela pengaturan & kontrol."""
+"""Jendela utama (desain: mockup/ui-mockup-v2.html)."""
 
 import os
+import shutil
+import subprocess
 import threading
+import time
 
-from PySide6.QtCore import QObject, Qt, QUrl, Signal
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtCore import QObject, QSize, Qt, QTimer, QUrl, Signal
+from PySide6.QtGui import QDesktopServices, QIcon, QPixmap
 from PySide6.QtWidgets import (
-    QCheckBox,
-    QComboBox,
-    QFileDialog,
-    QFormLayout,
-    QFrame,
-    QGroupBox,
-    QHBoxLayout,
-    QLabel,
-    QLineEdit,
-    QListWidget,
-    QMainWindow,
-    QMessageBox,
-    QPushButton,
-    QSlider,
-    QSpinBox,
-    QTabWidget,
-    QVBoxLayout,
-    QWidget,
+    QApplication, QFrame, QHBoxLayout, QLabel, QMainWindow, QMenu, QMessageBox, QScrollArea, QStackedWidget,
+    QSystemTrayIcon, QVBoxLayout, QWidget,
 )
 
-from .. import audio_setup, gpu_check
-from ..audio_capture import list_input_devices, list_loopback_devices, list_output_devices, record_sample
-from ..config import TRANSCRIPT_DIR
-from ..languages import LANGUAGES, language_name
+from .. import audio_setup, autostart, gpu_check
+from ..config import BUILTIN_MT_MODEL, DATA_DIR, MODELS_DIR
 from ..pipeline import LISTEN, Session
-from ..process_loopback import list_audio_apps
-from ..tts import XTTS_LANGUAGES
+from . import icons, theme
 from .overlay import SubtitleOverlay
+from .pages import AboutPage, HistoryPage, HomePage, ListenPage, SettingsPage, SpeakPage, SubtitlePage, short_device
+from .theme import ASSETS, Palette
+from .widgets import Banner, Dot, MsgItem, NavButton, Toast, VramBar, button, label, theme_bus, vbox
+from .wizard import Wizard
 
-WHISPER_MODELS = ["tiny", "base", "small", "medium", "large-v3-turbo"]
-MAX_LOG_ITEMS = 200
-RECORD_SECONDS = 15
-SAMPLE_TEXT = (
-    "Halo, nama saya ... Saya sedang merekam suara saya untuk penerjemah otomatis. "
-    "Hari ini cuacanya cerah, dan saya akan mengikuti rapat bersama tim. "
-    "Saya berbicara dengan tempo normal dan suara yang jelas."
-)
 LICENSE_TEXT = (
     "XTTS-v2 memakai lisensi Coqui Public Model License (CPML):\n"
     "hanya untuk penggunaan NON-KOMERSIAL.\n"
     "https://coqui.ai/cpml\n\n"
     "Apakah Anda setuju dengan lisensi tersebut?"
 )
+# Perkiraan porsi VRAM tiap model (GB) untuk membagi pemakaian total di bar VRAM.
+VRAM_SHARE = {"whisper": 0.9, "gemma": 2.6, "xtts": 1.2}
 
 
 class _Bridge(QObject):
@@ -56,465 +38,673 @@ class _Bridge(QObject):
 
     result = Signal(object)
     status = Signal(str)
-    recorded = Signal(str)
+    toast = Signal(str)
+    call = Signal(object)
     gpu = Signal(object)
+    vram = Signal(object)
+    mic = Signal()
+
+
+class Binder:
+    """Menyamakan beberapa widget yang mewakili satu pengaturan (mis. bahasa di Beranda & di Dengar)."""
+
+    def __init__(self, cfg):
+        self.cfg = cfg
+        self.widgets = {}
+        self.hooks = {}
+
+    def combo(self, attr, combo):
+        self.widgets.setdefault(attr, []).append(combo)
+        self._put(combo, getattr(self.cfg, attr))
+        combo.currentIndexChanged.connect(lambda _=0: self.set(attr, combo.currentData()))
+
+    def switch(self, attr, sw):
+        self.widgets.setdefault(attr, []).append(sw)
+        self._put(sw, getattr(self.cfg, attr))
+        sw.toggled.connect(lambda v: self.set(attr, v))
+
+    def on(self, attr, fn):
+        self.hooks.setdefault(attr, []).append(fn)
+
+    def set(self, attr, value):
+        setattr(self.cfg, attr, value)
+        for w in self.widgets.get(attr, []):
+            self._put(w, value)
+        for fn in self.hooks.get(attr, []):
+            fn(value)
+
+    @staticmethod
+    def _put(w, value):
+        w.blockSignals(True)
+        if hasattr(w, "findData"):
+            idx = w.findData(value)
+            if idx >= 0:
+                w.setCurrentIndex(idx)
+        else:
+            w.setChecked(bool(value))
+            if hasattr(w, "set_knob"):
+                w.set_knob(1.0 if value else 0.0)
+        w.blockSignals(False)
+        w.update()
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, cfg):
+    VERSION = "1.1.0"
+
+    def __init__(self, cfg, start_in_tray=False):
         super().__init__()
         self.cfg = cfg
-        self.setWindowTitle("AI Translator - TranslateGemma")
-        self.resize(600, 720)
+        self.setWindowTitle("AI Translator")
+        self.resize(1240, 820)
+        self.setMinimumSize(1000, 680)
+
+        theme.load_fonts()
+        Palette.set(theme.resolve_dark(cfg.theme))
+        QApplication.instance().setStyleSheet(theme.stylesheet())
 
         self.bridge = _Bridge()
         self.bridge.result.connect(self._on_result)
         self.bridge.status.connect(self._on_status)
-        self.bridge.recorded.connect(self._on_recorded)
+        self.bridge.toast.connect(self.toast)
+        self.bridge.call.connect(lambda fn: fn())
         self.bridge.gpu.connect(self._on_gpu)
-        self.session = Session(cfg, self.bridge.result.emit, self.bridge.status.emit)
+        self.bridge.vram.connect(self._on_vram)
+        self.bridge.mic.connect(self.refresh_status)
+        self.session = Session(cfg, self.bridge.result.emit, self.bridge.status.emit, self._level_from_thread)
         self.overlay = SubtitleOverlay(cfg)
+        self.binder = Binder(cfg)
 
-        self._build_ui()
-        self.overlay.setVisible(cfg.listen_enabled)
+        self.state = "idle"  # idle | loading | running
+        self.gpu = None
+        self.mic_state = "none"
+        self.vram_base = None
+        self.loaded = set()
+        self._levels = {}
+        self._count = 0
+        self._lat = 0
+        self._t0 = None
+        self._speak_off = False
+
+        self._build()
+        self.overlay.moved.connect(self.pages["subtitle"].overlay_moved)
+        self.toaster = Toast(self.centralWidget())
+        self.wizard = Wizard(self, self.centralWidget())
+        self.wizard.finished.connect(self.refresh_status)
+
+        self._clock = QTimer(self)
+        self._clock.timeout.connect(self._tick)
+        self._vram_timer = QTimer(self)
+        self._vram_timer.timeout.connect(self._poll_vram)
+        self._vram_timer.start(2500)
+        self._level_timer = QTimer(self)
+        self._level_timer.timeout.connect(self._show_levels)
+        self._level_timer.start(120)
+
+        self._tray()
+        self.go("home")
+        self.refresh_status()
+        threading.Thread(target=lambda: self.bridge.gpu.emit(gpu_check.get()), daemon=True).start()
+        self._poll_vram()
+        if not start_in_tray:
+            self.show()
+            theme.set_titlebar_dark(self, Palette.dark)
+            if not cfg.onboarding_done:
+                QTimer.singleShot(300, self.open_wizard)
+
+    # ================================================================ tata letak
+    def _build(self):
+        root = QWidget()
+        root.setObjectName("root")
+        h = QHBoxLayout(root)
+        h.setContentsMargins(0, 0, 0, 0)
+        h.setSpacing(0)
+        h.addWidget(self._sidebar())
+
+        main = QWidget()
+        mv = QVBoxLayout(main)
+        mv.setContentsMargins(0, 0, 0, 0)
+        mv.setSpacing(0)
+        mv.addWidget(self._topbar())
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        content = QWidget()
+        content.setObjectName("content")
+        cv = QVBoxLayout(content)
+        cv.setContentsMargins(24, 20, 24, 28)
+        cv.setSpacing(16)
+        self.gpu_banner = Banner("", "", "Unduh driver NVIDIA")
+        self.gpu_banner.button.clicked.connect(self.open_driver_page)
+        self.gpu_banner.hide()
+        cv.addWidget(self.gpu_banner)
+        self.stack = QStackedWidget()
+        self.pages = {"home": None, "listen": None, "speak": None}
+        # Urutan pembuatan: Bicara & Dengar dulu karena Beranda memakai data mereka (rute, mic).
+        self.pages["speak"] = SpeakPage(self)
+        self.pages["listen"] = ListenPage(self)
+        self.pages["home"] = HomePage(self)
+        self.pages["subtitle"] = SubtitlePage(self)
+        self.pages["history"] = HistoryPage(self)
+        self.pages["settings"] = SettingsPage(self)
+        self.pages["about"] = AboutPage(self)
+        for key in ("home", "listen", "speak", "subtitle", "history", "settings", "about"):
+            self.stack.addWidget(self.pages[key])
+        cv.addWidget(self.stack)
+        cv.addStretch(1)
+        scroll.setWidget(content)
+        self.scroll = scroll
+        mv.addWidget(scroll, 1)
+        h.addWidget(main, 1)
+        self.setCentralWidget(root)
+        self.update_routes()
+
+    def _sidebar(self):
+        side = QFrame()
+        side.setObjectName("side")
+        side.setFixedWidth(236)
+        v = QVBoxLayout(side)
+        v.setContentsMargins(12, 14, 12, 14)
+        v.setSpacing(2)
+
+        logo = QLabel()
+        pm = QPixmap(os.path.join(ASSETS, "icon.png"))
+        pm.setDevicePixelRatio(pm.width() / 36)
+        logo.setPixmap(pm)
+        logo.setFixedSize(36, 36)
+        brand = QHBoxLayout()
+        brand.setContentsMargins(8, 4, 8, 14)
+        brand.setSpacing(10)
+        brand.addWidget(logo)
+        brand.addLayout(vbox(label("AI Translator", "brandName"), label("Offline · v" + self.VERSION[:3], "brandSub"), spacing=0))
+        brand.addStretch(1)
+        v.addLayout(brand)
+
+        self.nav = {}
+
+        def nav(key, icon_name, text):
+            b = NavButton(icon_name, text)
+            b.clicked.connect(lambda: self.go(key))
+            self.nav[key] = b
+            v.addWidget(b)
+
+        nav("home", "home", "Beranda")
+        v.addWidget(label("TERJEMAHAN", "navLabel"))
+        nav("listen", "ear", "Dengar")
+        nav("speak", "mic", "Bicara")
+        nav("subtitle", "cc", "Subtitle")
+        nav("history", "hist", "Riwayat")
+        v.addWidget(label("SISTEM", "navLabel"))
+        nav("settings", "gear", "Pengaturan")
+        nav("about", "info", "Tentang")
+        v.addStretch(1)
+
+        health = QFrame()
+        health.setObjectName("health")
+        hv = QVBoxLayout(health)
+        hv.setContentsMargins(12, 12, 12, 12)
+        hv.setSpacing(8)
+        self.h_rows = {}
+        for key, text in (("gpu", "GPU"), ("mic", "Virtual mic"), ("model", "Model")):
+            dot = Dot("ok")
+            val = label("", "healthVal")
+            row = QHBoxLayout()
+            row.setSpacing(4)
+            row.addWidget(dot)
+            row.addWidget(label(text))
+            row.addStretch(1)
+            row.addWidget(val)
+            hv.addLayout(row)
+            self.h_rows[key] = (dot, val)
+        self.h_vram = label("—", "healthVal")
+        vr = QHBoxLayout()
+        vr.addWidget(label("VRAM"))
+        vr.addStretch(1)
+        vr.addWidget(self.h_vram)
+        hv.addLayout(vr)
+        self.h_bar = VramBar(6)
+        hv.addWidget(self.h_bar)
+        v.addWidget(health)
+        return side
+
+    def _topbar(self):
+        top = QFrame()
+        top.setObjectName("topbar")
+        h = QHBoxLayout(top)
+        h.setContentsMargins(24, 14, 24, 14)
+        h.setSpacing(10)
+        self.p_title = label("", "pageTitle")
+        self.p_sub = label("", "pageSub")
+        h.addLayout(vbox(self.p_title, self.p_sub, spacing=0), 1)
+
+        pill = QFrame()
+        pill.setObjectName("sessPill")
+        pl = QHBoxLayout(pill)
+        pl.setContentsMargins(8, 4, 12, 4)
+        pl.setSpacing(4)
+        self.sess_dot = Dot("none")
+        self.sess_txt = label("Siap")
+        pl.addWidget(self.sess_dot)
+        pl.addWidget(self.sess_txt)
+        self.sess_pill = pill
+        h.addWidget(pill)
+
+        self.start_btn = button("Mulai sesi", "btnPrimary", "play")
+        self.start_btn.setMinimumHeight(36)
+        self.start_btn.clicked.connect(self.toggle_session)
+        h.addWidget(self.start_btn)
+
+        self.theme_btn = button("", "iconBtn", "moon", tooltip="Ganti tema")
+        self.theme_btn.setFixedSize(34, 34)
+        self.theme_btn.setIconSize(QSize(16, 16))
+        self.theme_btn.clicked.connect(lambda: self.set_theme("light" if Palette.dark else "dark"))
+        h.addWidget(self.theme_btn)
+        return top
+
+    def _tray(self):
+        self.tray = QSystemTrayIcon(QIcon(os.path.join(ASSETS, "icon.ico")), self)
+        self.tray.setToolTip("AI Translator")
+        menu = QMenu()
+        menu.addAction("Buka AI Translator", self._show_from_tray)
+        self.tray_toggle = menu.addAction("Mulai sesi", self.toggle_session)
+        menu.addSeparator()
+        menu.addAction("Keluar", self.close)
+        self.tray.setContextMenu(menu)
+        self.tray.activated.connect(lambda r: self._show_from_tray() if r == QSystemTrayIcon.Trigger else None)
+        self.tray.show()
+
+    def _show_from_tray(self):
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+        theme.set_titlebar_dark(self, Palette.dark)
+        if not self.cfg.onboarding_done:
+            self.open_wizard()
+
+    # ================================================================ navigasi & umum
+    def go(self, key):
+        page = self.pages[key]
+        for k, b in self.nav.items():
+            b.setChecked(k == key)
+        self.stack.setCurrentWidget(page)
+        self.p_title.setText(page.title)
+        self.p_sub.setText(page.subtitle)
+        self.scroll.verticalScrollBar().setValue(0)
+        page.on_show()
+
+    def toast(self, msg, ms=2400):
+        self.toaster.show_message(msg, ms)
+
+    def open_wizard(self, step=0):
+        self.wizard.open(step)
+
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        if self.wizard.isVisible():
+            self.wizard.setGeometry(self.centralWidget().rect())
+
+    def set_theme(self, key):
+        self.cfg.theme = key
+        Palette.set(theme.resolve_dark(key))
+        QApplication.instance().setStyleSheet(theme.stylesheet())
+        theme_bus.changed.emit()
+        theme.set_titlebar_dark(self, Palette.dark)
+        self.pages["settings"].theme.set_value(key)
+        for w in self.findChildren(QWidget):
+            w.update()
+
+    def set_autostart(self, on):
+        try:
+            autostart.set_enabled(on)
+            self.cfg.autostart = on
+            self.toast("AI Translator akan dibuka saat Windows mulai" if on else "Mulai bersama Windows dimatikan")
+        except OSError as e:
+            self.toast("Gagal mengubah autostart: {}".format(e))
+
+    def open_driver_page(self):
+        QDesktopServices.openUrl(QUrl(gpu_check.DRIVER_URL))
+        self.toast("Membuka halaman driver NVIDIA")
+
+    def open_log(self):
+        path = os.path.join(DATA_DIR, "app.log")
+        if os.path.exists(path):
+            os.startfile(path)
+        else:
+            self.toast("Belum ada app.log")
+
+    def recheck_gpu(self):
+        gpu_check._cached = None
+        self.toast("Memeriksa GPU…")
         threading.Thread(target=lambda: self.bridge.gpu.emit(gpu_check.get()), daemon=True).start()
 
-    # ---------- UI ----------
-    def _build_ui(self):
-        root = QWidget()
-        layout = QVBoxLayout(root)
+    # ================================================================ status sistem
+    def vmic_name(self):
+        if self.mic_state == "ok":
+            return audio_setup.MIC_NAME
+        if self.mic_state == "raw":
+            return "CABLE Output"
+        return "—"
 
-        top = QHBoxLayout()
-        self.start_btn = QPushButton("▶  Mulai")
-        self.start_btn.setMinimumHeight(40)
-        self.start_btn.clicked.connect(self._toggle)
-        self.overlay_btn = QPushButton("Tampilkan/Sembunyikan Subtitle")
-        self.overlay_btn.clicked.connect(lambda: self.overlay.setVisible(not self.overlay.isVisible()))
-        top.addWidget(self.start_btn, 2)
-        top.addWidget(self.overlay_btn, 1)
-        layout.addLayout(top)
+    def _models_installed(self):
+        whisper = os.path.isfile(os.path.join(MODELS_DIR, "whisper", "faster-whisper-" + self.cfg.whisper_model, "model.bin"))
+        tts = os.path.isdir(os.path.join(MODELS_DIR, "tts"))
+        return [os.path.exists(BUILTIN_MT_MODEL), whisper, tts]
 
-        self.status_label = QLabel("Siap.")
-        self.status_label.setWordWrap(True)
-        layout.addWidget(self.status_label)
-
-        self.gpu_banner = QFrame()
-        self.gpu_banner.setStyleSheet(
-            "QFrame { background: #fff4e5; border: 1px solid #f5c27a; border-radius: 6px; } "
-            "QLabel { color: #7a4a00; border: none; }"
-        )
-        banner = QHBoxLayout(self.gpu_banner)
-        self.gpu_banner_label = QLabel()
-        self.gpu_banner_label.setWordWrap(True)
-        self.driver_btn = QPushButton("Unduh driver NVIDIA")
-        self.driver_btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(gpu_check.DRIVER_URL)))
-        banner.addWidget(self.gpu_banner_label, 1)
-        banner.addWidget(self.driver_btn)
-        self.gpu_banner.hide()
-        layout.addWidget(self.gpu_banner)
-
-        self.tabs = QTabWidget()
-        self.tabs.addTab(self._build_listen_tab(), "Dengar → subtitle")
-        self.tabs.addTab(self._build_speak_tab(), "Bicara → virtual mic")
-        self.tabs.addTab(self._build_engine_tab(), "Engine")
-        layout.addWidget(self.tabs)
-
-        hist_row = QHBoxLayout()
-        hist_row.addWidget(QLabel("Riwayat:"))
-        hist_row.addStretch()
-        open_btn = QPushButton("Buka folder transkrip")
-        open_btn.clicked.connect(self._open_transcripts)
-        hist_row.addWidget(open_btn)
-        layout.addLayout(hist_row)
-
-        self.log_list = QListWidget()
-        self.log_list.setWordWrap(True)
-        layout.addWidget(self.log_list, 1)
-
-        self.setCentralWidget(root)
-
-    def _device_combo(self, names, default_label, current):
-        combo = QComboBox()
-        combo.addItem(default_label, "")
-        for name in names:
-            combo.addItem(name, name)
-        self._select(combo, current)
-        return combo
-
-    def _lang_combo(self, codes, current, auto=False):
-        combo = QComboBox()
-        if auto:
-            combo.addItem("Deteksi otomatis", "auto")
-        for code in sorted(codes, key=language_name):
-            combo.addItem("{} ({})".format(language_name(code), code), code)
-        self._select(combo, current)
-        return combo
-
-    def _safe_devices(self, fn):
+    def refresh_status(self):
         try:
-            return fn()
-        except Exception as e:
-            self.status_label.setText("Gagal membaca perangkat audio: {}".format(e))
-            return []
-
-    def _build_listen_tab(self):
-        tab = QWidget()
-        v = QVBoxLayout(tab)
-
-        self.listen_box = QGroupBox("Terjemahkan suara dari speaker/headset (Zoom, Meet, Teams, YouTube...)")
-        self.listen_box.setCheckable(True)
-        self.listen_box.setChecked(self.cfg.listen_enabled)
-        form = QFormLayout(self.listen_box)
-        self.loopback_combo = self._device_combo(
-            self._safe_devices(list_loopback_devices), "Output default Windows", self.cfg.loopback_device
-        )
-        form.addRow("Perangkat output:", self.loopback_combo)
-        app_row = QHBoxLayout()
-        self.app_combo = QComboBox()
-        self.app_combo.currentIndexChanged.connect(self._on_app_changed)
-        refresh_btn = QPushButton("↻")
-        refresh_btn.setToolTip("Muat ulang daftar aplikasi yang sedang terbuka")
-        refresh_btn.setFixedWidth(32)
-        refresh_btn.clicked.connect(self._refresh_apps)
-        app_row.addWidget(self.app_combo, 1)
-        app_row.addWidget(refresh_btn)
-        form.addRow("Tangkap dari:", app_row)
-        self._refresh_apps()
-        self.src_combo = self._lang_combo(LANGUAGES, self.cfg.source_language, auto=True)
-        self.tgt_combo = self._lang_combo(LANGUAGES, self.cfg.target_language)
-        form.addRow("Bahasa sumber:", self.src_combo)
-        form.addRow("Terjemahkan ke:", self.tgt_combo)
-        v.addWidget(self.listen_box)
-
-        view_box = QGroupBox("Tampilan subtitle (bisa diubah kapan saja)")
-        vform = QFormLayout(view_box)
-        self.font_spin = QSpinBox()
-        self.font_spin.setRange(12, 72)
-        self.font_spin.setValue(self.cfg.font_size)
-        self.font_spin.valueChanged.connect(self._on_view_changed)
-        vform.addRow("Ukuran font:", self.font_spin)
-        self.opacity_slider = QSlider(Qt.Horizontal)
-        self.opacity_slider.setRange(0, 100)
-        self.opacity_slider.setValue(int(self.cfg.overlay_opacity * 100))
-        self.opacity_slider.valueChanged.connect(self._on_view_changed)
-        vform.addRow("Gelap latar:", self.opacity_slider)
-        self.original_chk = QCheckBox("Tampilkan teks asli di atas terjemahan")
-        self.original_chk.setChecked(self.cfg.show_original)
-        self.original_chk.toggled.connect(self._on_view_changed)
-        vform.addRow(self.original_chk)
-        self.capture_chk = QCheckBox("Sembunyikan subtitle saat share screen")
-        self.capture_chk.setChecked(self.cfg.hide_from_capture)
-        self.capture_chk.toggled.connect(self._on_view_changed)
-        vform.addRow(self.capture_chk)
-        v.addWidget(view_box)
-        v.addStretch()
-        return tab
-
-    def _refresh_apps(self):
-        current = self.app_combo.currentData() if self.app_combo.count() else self.cfg.loopback_app
-        self.app_combo.blockSignals(True)
-        self.app_combo.clear()
-        self.app_combo.addItem("Semua suara di perangkat output", "")
-        apps = self._safe_devices(list_audio_apps)
-        if current and current not in apps:
-            apps.append(current)  # tetap tampil walau aplikasinya belum dibuka
-        for name in sorted(apps, key=str.lower):
-            self.app_combo.addItem("Hanya aplikasi: " + name, name)
-        self._select(self.app_combo, current)
-        self.app_combo.blockSignals(False)
-        self._on_app_changed()
-
-    def _on_app_changed(self, *_):
-        # Process loopback tidak terikat perangkat output; suara aplikasi ditangkap di mana pun diputar.
-        self.loopback_combo.setEnabled(not self.app_combo.currentData())
-
-    def _build_speak_tab(self):
-        tab = QWidget()
-        v = QVBoxLayout(tab)
-
-        self.speak_box = QGroupBox("Terjemahkan suara Anda dan kirim ke virtual mic, memakai suara tiruan Anda")
-        self.speak_box.setCheckable(True)
-        self.speak_box.setChecked(self.cfg.speak_enabled)
-        self.speak_box.toggled.connect(self._on_speak_toggled)
-        form = QFormLayout(self.speak_box)
-
-        self.mic_combo = self._device_combo(
-            self._safe_devices(list_input_devices), "Mic default Windows", self.cfg.mic_device
-        )
-        form.addRow("Mikrofon Anda:", self.mic_combo)
-        self.mic_lang_combo = self._lang_combo(LANGUAGES, self.cfg.mic_language, auto=True)
-        form.addRow("Anda berbicara:", self.mic_lang_combo)
-        self.speak_tgt_combo = self._lang_combo(XTTS_LANGUAGES, self.cfg.speak_target_language)
-        form.addRow("Terjemahkan ke:", self.speak_tgt_combo)
-
-        self.vmic_combo = QComboBox()
-        self.vmic_combo.addItem("Otomatis (VB-CABLE)", "")
-        for name in self._safe_devices(list_output_devices):
-            self.vmic_combo.addItem(name, name)
-        self._select(self.vmic_combo, self.cfg.virtual_mic_device)
-        form.addRow("Kirim ke (virtual mic):", self.vmic_combo)
-
-        self.vmic_status = QLabel()
-        self.vmic_status.setWordWrap(True)
-        self.vmic_status.setOpenExternalLinks(True)
-        self.vmic_fix_btn = QPushButton("Rapikan perangkat VB-CABLE")
-        self.vmic_fix_btn.setToolTip(
-            "Ganti nama mic menjadi \"{}\" dan sembunyikan \"CABLE In 16ch\" (butuh izin admin sekali).".format(
-                audio_setup.MIC_NAME
-            )
-        )
-        self.vmic_fix_btn.clicked.connect(self._fix_vmic)
-        vmic_row = QHBoxLayout()
-        vmic_row.addWidget(self.vmic_status, 1)
-        vmic_row.addWidget(self.vmic_fix_btn)
-        form.addRow(vmic_row)
-
-        voice_row = QHBoxLayout()
-        self.voice_edit = QLineEdit(self.cfg.voice_sample)
-        browse_btn = QPushButton("Pilih file...")
-        browse_btn.clicked.connect(self._browse_voice)
-        self.record_btn = QPushButton("● Rekam {} dtk".format(RECORD_SECONDS))
-        self.record_btn.clicked.connect(self._record_voice)
-        voice_row.addWidget(self.voice_edit, 1)
-        voice_row.addWidget(browse_btn)
-        voice_row.addWidget(self.record_btn)
-        form.addRow("Sampel suara Anda:", voice_row)
-
-        self.tts_device_combo = QComboBox()
-        self.tts_device_combo.addItem("GPU (cepat)", "cuda")
-        self.tts_device_combo.addItem("CPU (lambat, hemat VRAM)", "cpu")
-        self._select(self.tts_device_combo, self.cfg.tts_device)
-        form.addRow("XTTS jalan di:", self.tts_device_combo)
-        v.addWidget(self.speak_box)
-
-        self.speak_help = QLabel()
-        self.speak_help.setWordWrap(True)
-        self.speak_help.setOpenExternalLinks(True)
-        v.addWidget(self.speak_help)
-        v.addStretch()
-        self._refresh_vmic()
-        return tab
-
-    def _refresh_vmic(self):
-        try:
-            installed, configured, mic = audio_setup.is_installed(), audio_setup.is_configured(), audio_setup.mic_name()
+            if not audio_setup.is_installed():
+                self.mic_state = "none"
+            else:
+                self.mic_state = "ok" if audio_setup.is_configured() else "raw"
         except OSError:
-            installed = configured = False
-            mic = ""
-        if not installed:
-            self.vmic_status.setText(
-                "⚠ Virtual mic belum terpasang. Instal ulang AI Translator dengan opsi <b>VB-CABLE</b> dicentang, "
-                'atau pasang manual dari <a href="https://vb-audio.com/Cable/">vb-audio.com/Cable</a>, lalu restart PC.'
-            )
-            self.vmic_status.setStyleSheet("color: #d9822b;")
+            self.mic_state = "none"
+        home, speak = self.pages["home"], self.pages["speak"]
+
+        text = {"ok": audio_setup.mic_name() or audio_setup.MIC_NAME,
+                "raw": "CABLE Output (VB-Audio Virtual Cable) — belum dirapikan",
+                "none": "Belum terpasang — fitur Bicara tidak bisa dipakai"}[self.mic_state]
+        st = {"ok": "ok", "raw": "warn", "none": "bad"}[self.mic_state]
+        home.c_mic.set(st, sub=text)
+        home.fix_btn.setVisible(self.mic_state != "ok")
+        home.fix_btn.setText("Pasang" if self.mic_state == "none" else "Rapikan")
+        dot, val = self.h_rows["mic"]
+        dot.set_state(st)
+        val.setText({"ok": "Siap", "raw": "Rapikan", "none": "Tidak ada"}[self.mic_state])
+        if self.mic_state == "ok":
+            speak.banner.hide()
         else:
-            self.vmic_status.setText("✓ Virtual mic siap: <b>{}</b>".format(mic))
-            self.vmic_status.setStyleSheet("")
-        self.vmic_fix_btn.setVisible(installed and not configured)
-        self.speak_help.setText(
-            "Di Zoom/Meet/Teams pilih mikrofon <b>\"{}\"</b>. "
-            "Gunakan <b>headset</b> agar suara peserta lain tidak ikut tertangkap mic Anda.<br>"
-            "Virtual mic: VB-CABLE oleh VB-Audio (donationware, "
-            '<a href="https://vb-audio.com/Cable/">dukung pembuatnya</a>). '
-            "Model suara: XTTS-v2 (lisensi non-komersial).".format(mic or audio_setup.MIC_NAME)
-        )
+            speak.banner.show()
+            if self.mic_state == "none":
+                speak.banner.set("Virtual mic belum terpasang",
+                                 "Pasang VB-CABLE (sekali, butuh restart) agar suara terjemahan bisa masuk ke Zoom/Meet.",
+                                 "Pasang VB-CABLE")
+            else:
+                speak.banner.set("Virtual mic belum dirapikan",
+                                 "Masih bernama \"CABLE Output\" dan ada perangkat \"CABLE In 16ch\" yang tidak dipakai.",
+                                 "Rapikan (izin admin)")
+        self.nav["speak"].set_badge("" if self.mic_state == "ok" else "1", warn=True)
 
-    def _fix_vmic(self):
-        if audio_setup.is_admin():
-            audio_setup.configure()
-        elif not audio_setup.configure_elevated():
-            self.status_label.setText("Izin admin ditolak, perangkat VB-CABLE tidak dirapikan.")
+        if speak.voice_ok:
+            home.c_voice.set("ok", sub=speak.voice_info.text())
+        else:
+            home.c_voice.set("warn", sub="Belum ada — rekam 15 detik untuk fitur Bicara")
+
+        have = self._models_installed()
+        dot, val = self.h_rows["model"]
+        dot.set_state("ok" if all(have) else "warn")
+        val.setText("{}/3 terpasang".format(sum(have)))
+        home.c_models.set("ok" if all(have) else "warn",
+                          sub="Whisper {} · TranslateGemma 4B · XTTS-v2".format(self.cfg.whisper_model))
+
+        self.nav["history"].set_badge(self.pages["history"].count() or "")
+        self.update_routes()
+        speak.refresh_guide()
+        self._ready_hint()
+
+    def _ready_hint(self):
+        issues = int(self.gpu is not None and self.gpu.status != "ok") + int(self.mic_state != "ok")
+        self.pages["home"].ready_hint.setText("{} perlu perhatian".format(issues) if issues else "Semua siap")
+
+    def _on_gpu(self, info):
+        self.gpu = info
+        home, settings = self.pages["home"], self.pages["settings"]
+        settings.set_gpu(info)
+        dot, val = self.h_rows["gpu"]
+        if info.status == "ok":
+            home.c_gpu.set("ok", "GPU " + info.name, "{:.0f} GB · driver {} · CUDA siap".format(info.vram_mb / 1024, info.driver)
+                           if info.vram_mb else "driver {}".format(info.driver))
+            dot.set_state("ok")
+            val.setText(info.name.replace("NVIDIA GeForce ", "").replace("NVIDIA ", ""))
+            self.gpu_banner.hide()
+        else:
+            titles = {"old": "Driver NVIDIA terlalu lama ({})".format(info.driver),
+                      "missing": "Driver NVIDIA belum terpasang", "none": "Tidak ada GPU NVIDIA"}
+            texts = {"old": "Disarankan {}.{} atau lebih baru. Tanpa pembaruan, aplikasi bisa jalan di CPU dan lambat.".format(*gpu_check.MIN_DRIVER),
+                     "missing": "{} terdeteksi. Pasang drivernya agar model berjalan di GPU.".format(info.name or "GPU NVIDIA"),
+                     "none": "Aplikasi jalan di CPU: subtitle tertunda ±5 detik, fitur Bicara tidak disarankan."}
+            self.gpu_banner.set(titles[info.status], texts[info.status],
+                                "Unduh driver NVIDIA" if info.status in ("old", "missing") else None)
+            self.gpu_banner.show()
+            home.c_gpu.set("bad" if info.status == "none" else "warn",
+                           "Tanpa GPU NVIDIA" if info.status == "none" else "GPU " + info.name, texts[info.status])
+            dot.set_state("bad" if info.status == "none" else "warn")
+            val.setText({"old": "Driver lama", "missing": "Tanpa driver", "none": "CPU"}[info.status])
+        self.nav["settings"].set_badge("" if info.status == "ok" else "!", warn=True)
+        self._ready_hint()
+
+    def update_routes(self):
+        if any(self.pages.get(k) is None for k in ("home", "listen", "speak")):
             return
-        self._refresh_vmic()
-        self.status_label.setText(
-            "Perangkat VB-CABLE dirapikan." if audio_setup.is_configured()
-            else "Gagal merapikan perangkat VB-CABLE (lihat app.log)."
-        )
+        speak = self.pages["speak"]
+        self.pages["home"].set_routes(self.pages["listen"].source_title(), speak.mic_title(), self.vmic_name())
+        speak.stages[0].sub.setText(short_device(self.cfg.mic_device) or "Mic default")
+        speak.stages[4].sub.setText(self.vmic_name())
 
-    def _build_engine_tab(self):
-        tab = QWidget()
-        form = QFormLayout(tab)
-        self.gpu_label = QLabel("Memeriksa GPU...")
-        self.gpu_label.setWordWrap(True)
-        form.addRow("GPU:", self.gpu_label)
-        self.whisper_combo = QComboBox()
-        self.whisper_combo.addItems(WHISPER_MODELS)
-        self.whisper_combo.setCurrentText(self.cfg.whisper_model)
-        form.addRow("Model Whisper:", self.whisper_combo)
-        self.backend_combo = QComboBox()
-        self.backend_combo.addItem("Bawaan aplikasi (llama.cpp, offline)", "builtin")
-        self.backend_combo.addItem("Server Ollama (lokal / VPS)", "ollama")
-        self._select(self.backend_combo, self.cfg.translator_backend)
-        self.backend_combo.currentIndexChanged.connect(self._on_backend_changed)
-        form.addRow("Mesin terjemahan:", self.backend_combo)
-        self.url_edit = QLineEdit(self.cfg.ollama_url)
-        self.model_edit = QLineEdit(self.cfg.ollama_model)
-        form.addRow("Server Ollama:", self.url_edit)
-        form.addRow("Model terjemahan:", self.model_edit)
-        self.transcript_chk = QCheckBox("Simpan transkrip ke folder transcripts/")
-        self.transcript_chk.setChecked(self.cfg.save_transcript)
-        form.addRow(self.transcript_chk)
-        self._on_backend_changed()
-        return tab
+    def fix_virtual_mic(self):
+        if self.mic_state == "none":
+            QDesktopServices.openUrl(QUrl("https://vb-audio.com/Cable/"))
+            self.toast("Pasang VB-CABLE, restart PC, lalu buka aplikasi ini lagi", 5000)
+            return
+        self.toast("Meminta izin admin untuk merapikan VB-CABLE…")
 
-    def _on_backend_changed(self, *_):
-        ollama = self.backend_combo.currentData() == "ollama"
-        self.url_edit.setEnabled(ollama)
-        self.model_edit.setEnabled(ollama)
+        def work():
+            if audio_setup.is_admin():
+                audio_setup.configure()
+                ok = True
+            else:
+                ok = audio_setup.configure_elevated()
+            self.bridge.mic.emit()
+            done = ok and audio_setup.is_configured()
+            self.bridge.toast.emit("Perangkat dirapikan: " + audio_setup.MIC_NAME if done
+                                   else "Izin admin ditolak atau gagal — lihat app.log")
 
-    @staticmethod
-    def _select(combo, value):
-        idx = combo.findData(value)
-        if idx >= 0:
-            combo.setCurrentIndex(idx)
+        threading.Thread(target=work, daemon=True).start()
 
-    # ---------- Aksi ----------
-    def _read_settings(self):
-        c = self.cfg
-        c.listen_enabled = self.listen_box.isChecked()
-        c.loopback_device = self.loopback_combo.currentData()
-        c.loopback_app = self.app_combo.currentData() or ""
-        c.source_language = self.src_combo.currentData()
-        c.target_language = self.tgt_combo.currentData()
+    # ================================================================ VRAM
+    def _poll_vram(self):
+        def work():
+            exe = shutil.which("nvidia-smi") or os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32", "nvidia-smi.exe")
+            if not os.path.exists(exe):
+                return
+            try:
+                out = subprocess.run([exe, "--query-gpu=memory.used,memory.total", "--format=csv,noheader,nounits"],
+                                     capture_output=True, text=True, timeout=5,
+                                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)).stdout.split(",")
+                self.bridge.vram.emit((float(out[0]) / 1024, float(out[1]) / 1024))
+            except (OSError, ValueError, IndexError, subprocess.SubprocessError):
+                pass
 
-        c.speak_enabled = self.speak_box.isChecked()
-        c.mic_device = self.mic_combo.currentData()
-        c.mic_language = self.mic_lang_combo.currentData()
-        c.speak_target_language = self.speak_tgt_combo.currentData()
-        c.virtual_mic_device = self.vmic_combo.currentData() or ""
-        c.voice_sample = self.voice_edit.text().strip()
-        c.tts_device = self.tts_device_combo.currentData()
+        threading.Thread(target=work, daemon=True).start()
 
-        c.whisper_model = self.whisper_combo.currentText()
-        c.translator_backend = self.backend_combo.currentData()
-        c.ollama_url = self.url_edit.text().strip() or "http://localhost:11434"
-        c.ollama_model = self.model_edit.text().strip() or "translategemma:4b"
-        c.save_transcript = self.transcript_chk.isChecked()
+    def _on_vram(self, data):
+        used, total = data
+        if self.state == "idle" or self.vram_base is None:
+            self.vram_base = used
+        base = min(self.vram_base, used)
+        extra = max(used - base, 0)
+        names = [n for n in ("whisper", "gemma", "xtts") if n in self.loaded]
+        weight = sum(VRAM_SHARE[n] for n in names)
+        parts = [base] + [extra * VRAM_SHARE[n] / weight if n in names and weight else 0 for n in ("whisper", "gemma", "xtts")]
+        self.h_bar.set_parts(parts, total)
+        self.h_vram.setText("{} / {} GB".format("{:.1f}".format(used).replace(".", ","), "{:.1f}".format(total).replace(".", ",")))
+        self.pages["settings"].set_vram(parts, total)
 
-    def _set_editable(self, editable):
-        for i in range(self.tabs.count()):
-            self.tabs.widget(i).setEnabled(editable)
-        # Tampilan subtitle tetap bisa diubah saat berjalan.
-        self.tabs.widget(0).setEnabled(True)
-        self.listen_box.setEnabled(editable)
-
-    def _toggle(self):
-        if self.session.running:
+    # ================================================================ sesi
+    def toggle_session(self):
+        if self.state != "idle":
             self.start_btn.setEnabled(False)
-            self.status_label.setText("Menghentikan...")
+            self.sess_txt.setText("Menghentikan…")
             self.session.stop()
             return
-        self._read_settings()
-        if self.cfg.speak_enabled and not self._ensure_license():
+        cfg = self.cfg
+        if not cfg.listen_enabled and not cfg.speak_enabled:
+            self.toast("Aktifkan minimal satu arah: Dengar atau Bicara")
             return
-        self.cfg.save()
-        self._set_editable(False)
-        self.start_btn.setText("■  Berhenti")
-        if self.cfg.listen_enabled:
-            self.overlay.show()
+        self._speak_off = False
+        if cfg.speak_enabled:
+            if self.mic_state == "none":
+                if not cfg.listen_enabled:
+                    self.toast("Virtual mic belum terpasang — fitur Bicara tidak bisa dipakai", 4000)
+                    return
+                self.toast("Virtual mic belum terpasang — fitur Bicara dimatikan untuk sesi ini", 4000)
+                self._speak_off = True
+            elif not self.pages["speak"].voice_ok:
+                self.toast("Rekam sampel suara dulu untuk fitur Bicara", 4000)
+                self.go("speak")
+                return
+            elif not self._ensure_license():
+                return
+        cfg.save()
+        self.loaded = set()
+        self._count, self._lat = 0, 0
+        home = self.pages["home"]
+        home.st_count.setText("0")
+        home.st_lat.setText("—")
+        home.st_time.setText("00:00")
+        home.feed.clear()
+        self.pages["listen"].feed.clear()
+        self._set_state("loading")
+        self.sess_txt.setText("Memuat model…")
+        # Bicara dimatikan sementara: Session membaca cfg saat _setup() di thread-nya sendiri.
+        self.session.cfg = cfg if not self._speak_off else _without_speak(cfg)
         self.session.start()
 
     def _ensure_license(self):
         if self.cfg.xtts_license_agreed:
             return True
-        answer = QMessageBox.question(self, "Lisensi XTTS-v2", LICENSE_TEXT)
-        if answer == QMessageBox.Yes:
+        if QMessageBox.question(self, "Lisensi XTTS-v2", LICENSE_TEXT) == QMessageBox.Yes:
             self.cfg.xtts_license_agreed = True
             return True
         return False
 
-    def _on_speak_toggled(self, checked):
-        if checked and not self._ensure_license():
-            self.speak_box.setChecked(False)
-
-    def _browse_voice(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Pilih sampel suara", "", "Audio WAV (*.wav)")
-        if path:
-            self.voice_edit.setText(path)
-
-    def _record_voice(self):
-        path = self.voice_edit.text().strip() or self.cfg.voice_sample
-        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-        answer = QMessageBox.information(
-            self,
-            "Rekam sampel suara",
-            "Setelah klik OK, bacakan teks berikut dengan suara normal selama {} detik:\n\n\"{}\"".format(
-                RECORD_SECONDS, SAMPLE_TEXT
-            ),
-            QMessageBox.Ok | QMessageBox.Cancel,
-        )
-        if answer != QMessageBox.Ok:
-            return
-        self.record_btn.setEnabled(False)
-        self.record_btn.setText("Merekam...")
-        device = self.mic_combo.currentData()
-
-        def work():
-            try:
-                secs = record_sample(device, RECORD_SECONDS, path)
-                self.bridge.recorded.emit("Sampel suara tersimpan ({:.0f} dtk): {}".format(secs, path))
-            except Exception as e:
-                self.bridge.recorded.emit("Gagal merekam: {}".format(e))
-
-        threading.Thread(target=work, daemon=True).start()
-
-    def _on_recorded(self, msg):
-        self.record_btn.setEnabled(True)
-        self.record_btn.setText("● Rekam {} dtk".format(RECORD_SECONDS))
-        self.status_label.setText(msg)
-
-    def _on_gpu(self, info):
-        self.gpu_label.setText(info.message())
-        if info.status == "ok" and not (info.vram_mb and info.vram_mb < gpu_check.MIN_VRAM_MB):
-            return
-        self.gpu_banner_label.setText("⚠ " + info.message())
-        self.driver_btn.setVisible(info.status in ("old", "missing"))
-        self.gpu_banner.show()
-
-    def _on_view_changed(self, *_):
-        c = self.cfg
-        c.font_size = self.font_spin.value()
-        c.overlay_opacity = self.opacity_slider.value() / 100.0
-        c.show_original = self.original_chk.isChecked()
-        c.hide_from_capture = self.capture_chk.isChecked()
-        self.overlay.apply_style()
-        self.overlay.apply_capture_exclusion()
-
-    def _open_transcripts(self):
-        os.makedirs(TRANSCRIPT_DIR, exist_ok=True)
-        os.startfile(TRANSCRIPT_DIR)
-
-    # ---------- Callback session ----------
-    def _on_result(self, r):
-        if r.direction == LISTEN:
-            self.overlay.set_text(r.original, r.translation)
-            tag = "🔊"
+    def _set_state(self, state):
+        self.state = state
+        self.start_btn.setEnabled(True)
+        running = state != "idle"
+        self.start_btn.setObjectName("btnStop" if running else "btnPrimary")
+        self.start_btn.setText("Berhenti" if running else "Mulai sesi")
+        self.start_btn.icon_name = "stop" if running else "play"
+        self.start_btn.setIcon(icons.icon(self.start_btn.icon_name, "#ffffff", 15))
+        self.tray_toggle.setText("Berhenti" if running else "Mulai sesi")
+        self.sess_pill.setProperty("running", "true" if state == "running" else "false")
+        # objectName/properti berubah -> QSS harus diterapkan ulang.
+        for w in (self.start_btn, self.sess_pill, self.sess_txt):
+            w.style().unpolish(w)
+            w.style().polish(w)
+        if state == "loading":
+            self.sess_dot.set_state("warn", pulse=True)
+        elif state == "running":
+            self.sess_dot.set_state("ok", pulse=True)
+            self._t0 = time.monotonic()
+            self._tick()
+            self._clock.start(500)
         else:
-            tag = "🎤"
-        self.log_list.addItem(
-            "{} [{}] {}\n→ {}   (ASR {} ms, terjemah {} ms)".format(
-                tag, r.language, r.original, r.translation, r.asr_ms, r.mt_ms
-            )
-        )
-        while self.log_list.count() > MAX_LOG_ITEMS:
-            self.log_list.takeItem(0)
-        self.log_list.scrollToBottom()
+            self.sess_dot.set_state("none")
+            self._clock.stop()
+            for key in ("listen", "speak"):
+                self.nav[key].set_live(False)
+            for m in self._meters():
+                m.set_db(None)
+            self._levels = {}
+            self.loaded = set()
+        self.sync_playing()
+
+    def _meters(self):
+        home = self.pages["home"]
+        return [home.listen_meter, home.speak_meter, self.pages["listen"].meter, self.pages["speak"].meter]
+
+    def sync_playing(self):
+        self.pages["listen"].set_playing(self.state == "running" and self.cfg.listen_enabled)
+
+    def _tick(self):
+        if self._t0 is None:
+            return
+        s = int(time.monotonic() - self._t0)
+        t = "{:02d}:{:02d}".format(s // 60, s % 60)
+        self.sess_txt.setText("Berjalan · " + t)
+        self.pages["home"].st_time.setText(t)
 
     def _on_status(self, msg):
         if msg == "STOPPED":
-            self._set_editable(True)
-            self.start_btn.setEnabled(True)
-            self.start_btn.setText("▶  Mulai")
-            if not self.status_label.text().startswith("ERROR"):
-                self.status_label.setText("Berhenti.")
+            was = self.state
+            self._set_state("idle")
+            if self.sess_txt.text() != "Error":
+                self.sess_txt.setText("Berhenti")
+            self.session.cfg = self.cfg
+            if was != "idle":
+                self.pages["history"].reload()
+                self.nav["history"].set_badge(self.pages["history"].count() or "")
             return
-        self.status_label.setText(msg)
+        if msg.startswith("ERROR"):
+            self.sess_txt.setText("Error")
+            QMessageBox.warning(self, "AI Translator", msg[len("ERROR: "):])
+            return
+        if msg == "RUNNING":
+            speak_on = self.cfg.speak_enabled and not self._speak_off
+            self._set_state("running")
+            self.nav["listen"].set_live(self.cfg.listen_enabled)
+            self.nav["speak"].set_live(speak_on)
+            self.loaded.update(["whisper", "gemma"] + (["xtts"] if speak_on else []))
+            if self.cfg.listen_enabled and self.cfg.overlay_enabled:
+                self.overlay.show()
+            return
+        if self.state == "loading":
+            for key, word in (("gemma", "TranslateGemma"), ("whisper", "Whisper"), ("xtts", "XTTS")):
+                if word in msg:
+                    self.loaded.add(key)
+            self.sess_txt.setText(msg.split(" (")[0].strip())
+        elif self.state == "running" and not msg.startswith(("Dengar:", "Bicara:")):
+            self.toast(msg, 4000)
 
+    def _level_from_thread(self, direction, db):
+        self._levels[direction] = db  # dibaca timer UI (_show_levels); tidak menyentuh widget dari thread lain
+
+    def _show_levels(self):
+        if self.state != "running":
+            return
+        home = self.pages["home"]
+        for direction, meters in ((LISTEN, (home.listen_meter, self.pages["listen"].meter)),
+                                  ("speak", (home.speak_meter, self.pages["speak"].meter))):
+            db = self._levels.get(direction)
+            for m in meters:
+                m.set_db(db)
+
+    def _on_result(self, r):
+        direction = "in" if r.direction == LISTEN else "out"
+        meta = ("<span style='color:{m}; font-weight:600'>{lang}</span>&nbsp;&nbsp;"
+                "<span style='color:{f}'>suara→teks {a} ms · terjemah {b} ms</span>").format(
+            m=Palette.c["muted"], f=Palette.c["faint"], lang=r.language.upper(), a=r.asr_ms, b=r.mt_ms)
+        stamp = time.strftime("%H:%M:%S")
+        home = self.pages["home"]
+        home.feed.add(MsgItem(direction, r.original, r.translation, stamp, meta))
+        if direction == "in":
+            self.pages["listen"].feed.add(MsgItem(direction, r.original, r.translation, stamp, meta))
+            self.overlay.set_text(r.original, r.translation)
+            self.pages["subtitle"].preview.set_text(r.original, r.translation)
+        else:
+            self.pages["speak"].set_timings(r.asr_ms, r.mt_ms)
+            self.pages["speak"].animate()
+        self._count += 1
+        self._lat += r.asr_ms + r.mt_ms
+        home.st_count.setText(str(self._count))
+        home.st_lat.setText("{} dtk".format("{:.1f}".format(self._lat / self._count / 1000).replace(".", ",")))
+
+    # ================================================================ tutup
     def closeEvent(self, event):
         self.session.stop()
-        self.overlay.save_geometry()
-        self._on_view_changed()
-        self._read_settings()
+        if self.cfg.overlay_position == "custom":
+            self.overlay.save_geometry()
         self.cfg.save()
         self.overlay.close()
+        self.tray.hide()
         super().closeEvent(event)
+        QApplication.instance().quit()
+
+
+def _without_speak(cfg):
+    """Salinan pengaturan dengan Bicara dimatikan (untuk satu sesi), tanpa mengubah pilihan pengguna."""
+    import copy
+
+    c = copy.copy(cfg)
+    c.speak_enabled = False
+    return c

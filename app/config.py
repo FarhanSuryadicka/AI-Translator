@@ -43,6 +43,8 @@ class Config:
     loopback_device: str = ""
     # Nama .exe (mis. "Zoom.exe"): hanya suara dari aplikasi itu yang ditangkap. Kosong = semua suara.
     loopback_app: str = ""
+    # Jeda hening (ms) yang dianggap akhir kalimat. Lebih pendek = subtitle lebih cepat, tapi bisa terpotong.
+    listen_pause_ms: int = 650
 
     # Arah "Bicara": mic Anda -> terjemahan -> suara tiruan Anda -> virtual mic (VB-Audio Cable)
     speak_enabled: bool = False
@@ -53,6 +55,8 @@ class Config:
     virtual_mic_device: str = ""
     voice_sample: str = os.path.join(DATA_DIR, "voices", "my_voice.wav")
     tts_device: str = "cuda"
+    # Putar juga suara terjemahan (pelan) ke speaker/headset default untuk memantau.
+    speak_monitor: bool = False
     xtts_license_agreed: bool = False
 
     # Overlay
@@ -61,8 +65,14 @@ class Config:
     overlay_opacity: float = 0.75
     hide_from_capture: bool = True
     overlay_geometry: list = field(default_factory=list)
+    overlay_enabled: bool = True
+    overlay_position: str = "bottom"  # "bottom" | "top" | "custom" (digeser sendiri)
+    overlay_autohide_sec: int = 8  # 0 = tidak pernah hilang
 
     save_transcript: bool = True
+    theme: str = "auto"  # "auto" (ikut Windows) | "light" | "dark"
+    autostart: bool = False
+    onboarding_done: bool = False
 
     @classmethod
     def load(cls):

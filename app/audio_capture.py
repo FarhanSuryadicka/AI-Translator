@@ -138,7 +138,7 @@ class AudioPlayer:
     def __init__(self, device_name):
         self._pa = pyaudio.PyAudio()
         try:
-            dev = _find(self._pa, device_name, lambda d: d["maxOutputChannels"] > 0, None)
+            dev = _find(self._pa, device_name, lambda d: d["maxOutputChannels"] > 0, self._default_output)
         except Exception:
             self._pa.terminate()
             raise
@@ -152,6 +152,10 @@ class AudioPlayer:
             output=True,
             output_device_index=dev["index"],
         )
+
+    def _default_output(self):
+        index = self._pa.get_host_api_info_by_type(pyaudio.paWASAPI)["defaultOutputDevice"]
+        return self._pa.get_device_info_by_index(index)
 
     def play(self, samples, sr):
         x = resample(np.asarray(samples, dtype=np.float32), sr, self._rate)
@@ -188,3 +192,23 @@ def record_sample(device_name, seconds, path):
         w.setframerate(TARGET_SR)
         w.writeframes((audio * 32767).astype(np.int16).tobytes())
     return len(audio) / TARGET_SR
+
+
+def read_wav(path):
+    """WAV mono/stereo 16-bit -> (float32 mono, sample rate)."""
+    with wave.open(path, "rb") as w:
+        sr, ch = w.getframerate(), w.getnchannels()
+        data = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16).astype(np.float32) / 32768.0
+    if ch > 1:
+        data = data.reshape(-1, ch).mean(axis=1)
+    return data, sr
+
+
+def play_wav(path):
+    """Putar file WAV ke speaker default (blocking)."""
+    audio, sr = read_wav(path)
+    player = AudioPlayer("")
+    try:
+        player.play(audio, sr)
+    finally:
+        player.close()
